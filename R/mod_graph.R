@@ -4,9 +4,22 @@
 # ggplot2 + viridis.
 
 # info: the pathway's host selection (pinfo(r, pathway)).
+# Legend: each origin is named with its largest CN8 codes in the pathway (up to
+# n_codes, largest first, over the shown years), computed once over the whole
+# pathway so a country keeps one colour and one legend entry across facets.
 graph_data <- function(imports, cn8_table, pathway, info, years, present, country_names = character(),
-                       top_n = 6, origins = c("all", "present")) {
+                       top_n = 6, origins = c("all", "present"), n_codes = 3) {
   origins <- match.arg(origins)
+  all_lines <- pathway_lines(cn8_table, pathway, info)
+  xa <- imports[imports$cn8 %in% all_lines$cn8 & imports$year %in% years, ]
+  per_line <- dplyr::summarise(dplyr::group_by(xa, country, cn8), q = sum(kg, na.rm = TRUE), .groups = "drop")
+  per_line <- per_line[per_line$q > 0, ]
+  per_line <- per_line[order(per_line$country, -per_line$q), ]
+  codes <- tapply(cn8_code(per_line$cn8), per_line$country, function(v) paste(utils::head(unique(v), n_codes), collapse = ", "))
+  label <- function(cc) {
+    nm <- ifelse(is.na(country_names[cc]), cc, country_names[cc])
+    ifelse(is.na(codes[cc]), nm, paste0(nm, " (", codes[cc], ")"))
+  }
   rows <- lapply(info$groups, function(g) {
     lines <- pathway_lines(cn8_table, pathway, info, g)
     x <- imports[imports$cn8 %in% lines$cn8 & imports$year %in% years, ]
@@ -15,14 +28,10 @@ graph_data <- function(imports, cn8_table, pathway, info, years, present, countr
     by_c <- dplyr::summarise(dplyr::group_by(x, country, year), q = sum(kg, na.rm = TRUE), .groups = "drop")
     totals <- sort(tapply(by_c$q, by_c$country, sum), decreasing = TRUE)
     top <- utils::head(names(totals), top_n)
-    label <- function(cc) {
-      nm <- ifelse(is.na(country_names[cc]), cc, country_names[cc])
-      nm
-    }
-    by_c$origin <- ifelse(by_c$country %in% top, label(by_c$country), "Other")
+    by_c$origin <- ifelse(by_c$country %in% top, unname(label(by_c$country)), "Other countries")
     out <- dplyr::summarise(dplyr::group_by(by_c, origin, year), quantity = sum(q), .groups = "drop")
     out$group <- g
-    out$rank <- match(out$origin, label(top))  # 1 = largest
+    out$rank <- match(out$origin, unname(label(top)))  # 1 = largest
     out
   })
   d <- dplyr::bind_rows(rows)
@@ -40,8 +49,14 @@ graph_plot <- function(d, title, origins = "all") {
     ggplot2::facet_wrap(~group, scales = "free_y", ncol = 1) +
     ggplot2::scale_fill_viridis_d(option = "D") +
     ggplot2::labs(x = NULL, y = "million kg", title = title,
-                  fill = if (origins == "all") "Origin" else "Pest-present origin") +
-    ggplot2::theme_minimal(base_size = 13)
+                  fill = paste0(if (origins == "all") "Country of origin" else "Pest-present country",
+                                "\n(largest CN8 lines)"),
+                  caption = paste0("Bars: imports per year, stacked by country of origin (largest at the bottom). ",
+                                   "Codes in the legend: each country's largest CN8 lines in this pathway.
+",
+                                   "See Panel 1 for all lines. Source: SSB table 08801.")) +
+    ggplot2::theme_minimal(base_size = 13) +
+    ggplot2::theme(legend.position = "right", plot.caption = ggplot2::element_text(hjust = 0, size = 10))
 }
 
 mod_graph_ui <- function(id) {

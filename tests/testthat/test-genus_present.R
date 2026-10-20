@@ -89,8 +89,18 @@ test_that("graph stacks the largest origin at the bottom (last factor level), Ot
                         kg = c(1000, 10, 100, 1000), value_nok = 0)
   d <- graph_data(imp, cn8_table, "plants_for_planting", list(groups = "conifer"), 2025L, present = "DK", top_n = 2)
   lv <- levels(d$origin)
-  expect_equal(lv[1], "Other")
-  expect_equal(lv[length(lv)], "NL")
+  expect_equal(lv[1], "Other countries")
+  expect_equal(lv[length(lv)], "NL (06029098)")
   dp <- graph_data(imp, cn8_table, "plants_for_planting", list(groups = "conifer"), 2025L, present = "DK", origins = "present")
-  expect_equal(unique(as.character(dp$origin)), "DK")
+  expect_equal(unique(as.character(dp$origin)), "DK (06029098)")
+})
+
+test_that("legend names each country with its largest CN8 codes in the pathway", {
+  imp <- tibble::tibble(cn8 = c("06029098_2016", "06029010_2011", "06021029_2001", "06029059_2011", "06029098_2016"),
+                        country = c("NL", "NL", "NL", "NL", "DK"), year = 2025L,
+                        kg = c(500, 300, 100, 50, 10), value_nok = 0)
+  d <- graph_data(imp, cn8_table, "plants_for_planting", list(groups = "conifer"), 2025L, present = character(),
+                  country_names = c(NL = "Netherlands", DK = "Denmark"))
+  expect_true("Netherlands (06029098, 06029010, 06021029)" %in% levels(d$origin))  # top 3 codes, largest first
+  expect_true("Denmark (06029098)" %in% levels(d$origin))
 })

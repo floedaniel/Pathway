@@ -309,7 +309,7 @@ Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`
 Main changes since: single input is a code OR a name; pathways come from EPPO host commodities; woody list replaced by the taxonomic rule; kg only (no pc); median over 10 years; Class B replaced by pest-present kg and share; fixed pathways (hitchhiking etc.) removed; OpenAI instead of Claude/HF; write-up in a fixed layout with the LLM only for regulation sentences; footer disclaimers and the graph "*" removed; deployed on Posit Connect Cloud instead of a laptop.
 
 read whole plan before you start!
-Also see \old_scripts for old snippets that can be re used
+Also see old_scripts for old snippets that can be re used (folder deleted 2026-10-20)
 
 ## Goal
 Single input: EPPO code of the pest (e.g. XYLEFA). Everything else is derived.

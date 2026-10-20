@@ -10,6 +10,10 @@ editor_options:
 read whole plan before you start!
 Also see \old_scripts for old snippets that can be re used  
 
+## test species
+"C:\Users\dafl\Downloads\master_species.xlsx"
+use bark betles like Ips spp. 
+
 ## Goal
 Single input: EPPO code of the pest (e.g. XYLEFA). Everything else is derived.
 Outputs, as four panels in this order:
@@ -19,7 +23,7 @@ Outputs, as four panels in this order:
 4. Write-up for FinnPRIO, copy-paste ready
 
 ## Scope
-v1: woody hosts only (conifer, broadleaf). Commodities: plants for planting (CN8 list).
+v1: woody hosts only (conifer, broadleaf). Two pathways: plants for planting (0602) and wood (ch 44), CN8 list in `commodity_cn8.csv`.
 v2 (later): herbaceous hosts, crops, true seeds (unit pc). Out of scope now.
 Hosts classified `other` or herbaceous are ignored for the CN8 pull.
 
@@ -145,12 +149,6 @@ Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after 
 - Group-specific Lovdata search terms.
 - Optional: Eurostat behind `get_imports(cn8, countries, years)` for EU context.
 
-## Open questions for me
-- Which SSB table(s), and do they report kg for the plant CN8 lines?
-- Statistic for "annual" (default mean over 5 years)?
-- Which other FinnPRIO form fields should the write-up cover, in what order, and max length per field?
-- Write-up language: Norwegian or English?
-- Which HF models to compare?
 
 ## Vignett
 
@@ -160,16 +158,43 @@ Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after 
 https://github.com/floedaniel/Pathway.git
 git@github.com:floedaniel/Pathway.git 
 
-# data 
-- ssb data from table 08801 cn codes
-ssb_url  <- "http://data.ssb.no/api/v0/no/table/08801"
- 
+
+# data
+- SSB table 08801 (CN8 by country, 1988-2025). Use PxWebApi v2 (v0/v1 is legacy):
+  `https://data.ssb.no/api/pxwebapi/v2/tables/08801/data` (max 800,000 cells per call, 40 calls/min)
+- Q1 = kg on every line. Q2 = stk (pc) on 0602 lines, m³ on most wood lines.
+- Chapter 06 (0602) = live plants for planting. Chapter 44 = wood (round wood, sawn wood, chips, firewood, packaging).
+- EPPO: Global Database API v2, `https://api.eppo.int/gd/v2`, key in header `X-Api-Key` (v1 is legacy).
+
 # lovdata
 
-finn https://lovdata.no/dokument/SF/forskrift/2000-12-01-1333 
+finn https://lovdata.no/dokument/SF/forskrift/2000-12-01-1333
 
 https://api.lovdata.no/om-api-tjenesten/
 
 https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
- 
- 
+
+# Q & A
+
+## Answered (2026-10-20, details in docs/decisions.md)
+- SSB table: 08801, reports kg (Q1) for all plant and wood lines.
+- Statistic: median over 10 years (trade data are skewed).
+- Other FinnPRIO fields: none. The write-up covers ENT3 only.
+- Write-up length: 200 characters (to be tested).
+- Write-up language: English.
+- Pathways: both "plants for planting" (0602) and "wood" (ch 44), each with conifer/broadleaf groups.
+- HF = Hugging Face, a hub for open models (Llama, Qwen, Mistral, ...) reachable through one API. Used only to compare with Claude in Step 11.
+
+## Open questions for me
+1. **Review data/commodity_cn8.csv.** Rows marked `CHECK:` need a decision; set `reviewed` to a date when done.
+   - Plants: unrooted cuttings n.e.s. (06021029), rooted cuttings/young plants n.e.s. (06029059, may hold forest seedlings), indoor azalea (060230 1x), mixed shrub line incl. Sciadopitys (06029021), fruit/vegetable plants n.e.s. (06029092).
+   - Wood: include sawdust/wood waste (4401 40-49)? Include treated/impregnated wood (4403 11/12, 4406 9x, impregnated 4407)? Tropical hardwood counted as broadleaf?
+2. **Note: 0602 has no conifer-specific line (2016-2025).** Conifer plants for planting are only in the catch-all lines (06029010, 06029098, part of 06029021), so the plants class for conifers is a loose upper bound. OK to show it with that warning?
+3. **Wood units.** Use Q1 (kg) only and ignore Q2 (m³)? FinnPRIO ENT3 is in kg or pc.
+4. **Bark.** Many round-wood lines say "with bark" or "debarked". Show a with-bark subtotal in Panel 1 as information (not ENT3)?
+5. **One ENT3 per pathway.** Panel 1 shows both pathways. Which pathway does the write-up use: user picks in the UI (default plants for planting), or the larger class?
+6. **200 characters is tight.** Class, number, statistic and one Lovdata id fit; the data-source line will not. Drop the sources line from the write-up (they are shown in the footer)?
+7. **Test pests** (from master_species.xlsx), to confirm once EPPO hosts can be fetched: conifer-only IPSXCA, DENCPO, POLGPR, GIBBCI; broadleaf-only AROMBU, CERAFP; mixed PHYTRA, LYMAMA; herbaceous-heavy XYLEFA (tests the unreviewed-host stop). Add or swap?
+8. **HF models** for Step 11: pick 2-3, or let me propose current open models then?
+9. **Keys.** Put EPPO_KEY, ANTHROPIC_API_KEY, HF_TOKEN in `C:\Users\dafl\OneDrive - Folkehelseinstituttet\Documents\.Renviron` (R's home here). Which EPPO key file is valid for API v2: EPPO_API_KEY.txt or EPPO_beta.txt?
+10. **Push.** No SSH key on this PC. Add one to GitHub, or switch origin to HTTPS?

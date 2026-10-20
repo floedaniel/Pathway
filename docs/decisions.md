@@ -18,4 +18,8 @@ Amendments to the plan in `Pathwise_notes.Rmd`. Newer entries win.
 6. **SSB API.** If v0 is being phased out, build on PxWebApi v2. https only, respect query limits.
 7. **Countries.** If SSB Land codes are ISO2, `country_map.csv` holds only the exceptions.
 8. **Secrets.** `EPPO_KEY`, `ANTHROPIC_API_KEY`, `HF_TOKEN` in `~/.Renviron` (set by the user). Never read from key files, never committed. Checked at startup (`check_secrets()`), with a clear failure message.
-9. **Later (before Step 9).** Write-up template, language, HF models.
+9. **Later (before Step 9).** HF models.
+10. **API choices (verified 2026-10-20).** EPPO Global Database API v2 (`https://api.eppo.int/gd/v2`, header `X-Api-Key`, max 2000 requests per 10 s); v1 is marked legacy. SSB PxWebApi v2 (`https://data.ssb.no/api/pxwebapi/v2`, max 800,000 cells per call, 40 calls/min); SSB Land codes are ISO2 except CS_, XI (historical) and 97 (unspecified).
+11. **Statistic.** Median over 10 years (`volume_stat: median`, `volume_n: 10`); trade data are skewed.
+12. **Write-up.** ENT3 only, no other FinnPRIO fields. English. Max 200 characters (to be tested).
+13. **Two pathways.** Plants for planting (0602) and wood (ch 44: 4401, 4403, 4404, 4406, 4407, 4415), each with conifer/broadleaf groups, in `commodity_cn8.csv` (`pathway` column). Agglomerated wood (pellets, briquettes) excluded. 0602 has no conifer-specific line in 2016-2025, so conifer plants for planting are only in catch-all lines.

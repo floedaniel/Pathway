@@ -126,7 +126,21 @@ apply_rules <- function(rules) {
 out$genus <- apply_rules(genus_rules)
 out$excludes_genera <- apply_rules(residual_rules)
 
-out <- out[, c("pathway", "cn8", "description", "commodity_group", "genus", "excludes_genera",
+# ---- EPPO host-commodity categories (data/eppo_commodity_map.csv) -----------
+# A line counts for a pest only when EPPO lists one of its categories for the pest.
+category_rules <- list(
+  "^0602" = "plants for planting",
+  "^0601" = "bulbs or tubers",
+  "^4403|^44011[12]|^440110|^44012|^4404" = "non-squared wood",
+  "^4406|^4407" = "squared wood",
+  "^4401(40|41|49)|^4401390[129]_2012" = "bark;plant waste",
+  "^4415" = "packaging material",
+  "^4416|^940610" = "manufactured articles"
+)
+out$eppo_category <- apply_rules(category_rules)
+stopifnot(all(nzchar(out$eppo_category)))
+
+out <- out[, c("pathway", "cn8", "description", "commodity_group", "eppo_category", "genus", "excludes_genera",
                "flags", "source", "valid_from", "valid_to", "notes", "reviewed")]
 write.csv(out, "data/commodity_cn8.csv", row.names = FALSE, na = "", fileEncoding = "UTF-8")
 print(table(out$pathway, out$commodity_group))

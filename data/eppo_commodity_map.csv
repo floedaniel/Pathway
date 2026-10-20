@@ -1,0 +1,17 @@
+eppo_category,finnprio_pathway,status,cn8_scope,notes,reviewed
+plants for planting,plants_for_planting,computed,0602,,2026-10-20
+bulbs or tubers,plants_for_planting,computed,0601,FinnPRIO counts bulbs and tubers as plants for planting,2026-10-20
+non-squared wood,wood,computed,"4403 round wood; 4401 firewood, chips; 4404 split posts",,2026-10-20
+squared wood,wood,computed,"4406 sleepers; 4407 sawn timber",,2026-10-20
+bark,wood,computed,4401 40-49 sawdust and wood waste (incl. bark),,2026-10-20
+packaging material,wood,computed,4415 cases and pallets,Most packaging travels with other goods and has no SSB line,2026-10-20
+manufactured articles,wood,computed,"4416 casks; 9406.10 prefabricated wooden buildings",Partial: other manufactured wood (4409-4421) not included,2026-10-20
+plant waste,wood,computed,4401 40-49 sawdust and wood waste,Partial: only wood waste,2026-10-20
+seeds,seeds,manual,,Not computed in v1,2026-10-20
+cut flowers or branches,other_plant_parts,manual,,Not computed in v1,2026-10-20
+pollen,other_plant_parts,manual,,Not computed in v1,2026-10-20
+fruits or vegetables,food_fodder,manual,,Not computed in v1,2026-10-20
+stored products,food_fodder,manual,,Not computed in v1,2026-10-20
+soil/growing medium,,info,,Belongs with plants for planting; no CN line,2026-10-20
+agricultural machinery,,info,,Not host-specific; no trade volume,2026-10-20
+all commodities,,info,,Not host-specific,2026-10-20

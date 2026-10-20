@@ -32,7 +32,7 @@ mod_writeup_server <- function(id, result, pathways, settings) {
       r <- result()
       shiny::req(is.list(r), !inherits(r, "condition"))
       nonce <- input$regenerate
-      p <- intersect(pathways(), computed_pathways)
+      p <- intersect(pathways(), names(r$pathway_info))
       shiny::withProgress(message = "Writing ENT3 text", value = 0.5, {
         stats::setNames(lapply(p, function(x) {
           tryCatch(generate_writeup(r, x, settings, nonce = nonce), error = function(e) {
@@ -52,6 +52,10 @@ mod_writeup_server <- function(id, result, pathways, settings) {
           return(shiny::div(class = "mb-3", head, shiny::p(class = "text-muted", "Assess manually (not computed in v1).")))
         }
         x <- w[[p]]
+        if (is.null(x)) {
+          return(shiny::div(class = "mb-3", head, shiny::p(class = "text-muted",
+            "EPPO lists no host commodity of this pathway for the pest. Not assessed.")))
+        }
         n_rows <- min(30, length(strsplit(x$text, "\n")[[1]]) + 1)
         shiny::div(class = "mb-3", head,
           shiny::p(class = "small text-muted mb-1", writeup_label(x)),

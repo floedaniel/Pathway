@@ -24,7 +24,7 @@ The app stops at start with a clear message if a needed key is missing. SSB and 
 
 ## What you see
 
-Type an EPPO code (or look one up by name), pick pathways, press **Run**.
+Type an EPPO code or a scientific name (e.g. `AGRLAX` or `Agrilus anxius`) and press **Run**. The pathways are chosen automatically from the EPPO host-commodity list; the checkboxes can hide pathways afterwards.
 
 * **Header:** pest, host groups, number of hosts, number of countries where the pest is present, years.
 * **Panel 1, SSB table:** one block per pathway. The first row, *All host commodities (ENT3)*, gives the median annual import in kg over 10 years and its FinnPRIO class (`small`, `medium`, `large`). Beside it: the kg imported from countries where the pest is present, and its share (context only, not ENT3). Warnings explain where the class is an upper bound. Top origins are listed below.
@@ -36,8 +36,11 @@ Type an EPPO code (or look one up by name), pick pathways, press **Run**.
 ## How it works
 
 ```
-EPPO code
+EPPO code or scientific name
   -> EPPO: valid, active code                         (else stop)
+  -> EPPO host commodities (gd.eppo.int/taxon/{code}/pathwayshosts):
+       category + host genus -> FinnPRIO pathway and CN8 lines (data/eppo_commodity_map.csv);
+       no list (pest not EPPO/EU-listed) -> pathways from host plants, labelled
   -> EPPO hosts, classes "Major host" and "Host"      (else stop)
   -> host lineage: conifer | non-conifer | monocot    (no plant host: stop)
   -> EPPO distribution: countries with status "Present ..."   (none: stop)
@@ -52,6 +55,9 @@ From the EPPO taxonomy lineage, no hand-made list:
 * **conifer:** lineage contains Pinopsida, Pinales or Coniferales;
 * **non-conifer:** any other plant (kingdom Plantae), herbaceous plants included;
 * **monocot:** EPPO category "Basal monocotyledons" or "Commelinids" (used for bulbs and tubers).
+
+### Pathways from EPPO host commodities
+EPPO lists host commodities (at genus level) for EPPO/EU-listed pests. There is no API endpoint for them, so the app reads the table on `gd.eppo.int/taxon/{code}/pathwayshosts` once per pest (cached 30 days). `data/eppo_commodity_map.csv` maps each EPPO category to a FinnPRIO pathway: plants for planting and bulbs or tubers -> `plants_for_planting`; non-squared wood, squared wood, bark, packaging material, manufactured articles, plant waste -> `wood`; seeds, cut flowers or branches, pollen, fruits or vegetables, stored products -> assess manually; soil, machinery, all commodities -> information only. Each CN8 line carries the EPPO categories it belongs to (`eppo_category`), and only lines of the listed categories and host genera are counted. For pests without a list (about 20 % of A1/A2 pests, all Alert-list pests) the app falls back to the host plants and says so.
 
 ### Pathways and CN8 lines
 Pathway ids follow FinnPRIO. Lines are in `data/commodity_cn8.csv`, built by `dev/build_commodity_cn8.R` from the current SSB labels; every line records its source.

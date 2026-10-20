@@ -115,19 +115,43 @@ present_origins <- function(imports, lines, stat_years, present, total_kg, count
 
 # Warnings shown under a pathway's tables.
 pathway_notes <- function(pathway, r) {
+  info <- pinfo(r, pathway)
+  if (is.null(info)) return(character())
+  cats <- info$categories
+  from_eppo <- !is.null(cats)
   n <- character()
+  if (!from_eppo) n <- c(n, "EPPO lists no host commodities for this pest: CN8 lines are chosen from its host plants (Major host, Host).")
   if (pathway == "plants_for_planting") {
-    if ("conifer" %in% r$groups) n <- c(n, "Conifer plants for planting only appear in catch-all lines. Class is a loose upper bound.")
-    n <- c(n, if (isTRUE(r$monocot)) "Bulbs, tubers, corms and rhizomes (CN 0601) are included because at least one host is a monocot."
-              else "Bulbs and tubers (CN 0601) are not included: no monocot host. Dicot bulbs and tubers (e.g. Dahlia, Paeonia) are missed.",
-           "Soil associated with host plants belongs to this pathway but has no CN line.")
+    if ("conifer" %in% info$groups) n <- c(n, "Conifer plants for planting only appear in catch-all lines. Class is a loose upper bound.")
+    if (from_eppo) {
+      if ("bulbs or tubers" %in% cats) n <- c(n, "Bulbs and tubers (CN 0601) are included: EPPO lists them as host commodity.")
+    } else {
+      n <- c(n, if (isTRUE(info$monocot)) "Bulbs, tubers, corms and rhizomes (CN 0601) are included because at least one host is a monocot."
+                else "Bulbs and tubers (CN 0601) are not included: no monocot host. Dicot bulbs and tubers (e.g. Dahlia, Paeonia) are missed.")
+    }
+    n <- c(n, "Soil associated with host plants belongs to this pathway but has no CN line.")
   }
   if (pathway == "wood") {
-    n <- c(n, "Genus-specific wood lines (e.g. birch, oak, pine) count only for host genera; mixed lines (firewood, chips, waste, packaging) are an upper bound.",
-           "Wood packaging: CN 4415 only captures packaging traded as goods. Most packaging travels with other products and has no SSB line.",
-           "Bark is part of this pathway; isolated bark is counted in the wood waste lines (4401 40-49).")
+    n <- c(n, "Genus-specific wood lines (e.g. birch, oak, pine) count only for host genera; mixed lines (firewood, chips, waste, packaging) are an upper bound.")
+    if (!from_eppo || "packaging material" %in% cats) n <- c(n, "Wood packaging: CN 4415 only captures packaging traded as goods. Most packaging travels with other products and has no SSB line.")
+    if (!from_eppo || "bark" %in% cats) n <- c(n, "Bark is part of this pathway; isolated bark is counted in the wood waste lines (4401 40-49).")
+    if ("manufactured articles" %in% cats) n <- c(n, "Manufactured articles: only casks (4416) and prefabricated wooden buildings (9406.10) are counted; other manufactured wood is not.")
   }
   n
+}
+
+# One line under the pathway heading: what the CN8 lines are based on.
+pathway_basis <- function(pathway, r) {
+  info <- pinfo(r, pathway)
+  if (is.null(info)) return(NULL)
+  genera <- sort(unique(stats::na.omit(ifelse(info$hosts$host_class == "all_plants", "all plants",
+                                              info$hosts$genus %||% info$hosts$prefname))))
+  if (is.null(info$categories)) {
+    paste0("Basis: host plants (", length(unique(info$hosts$eppocode)), " Major host / Host records).")
+  } else {
+    paste0("Basis: EPPO host commodities: ", paste(info$categories, collapse = ", "), "; host genera: ",
+           paste(genera, collapse = ", "), ".")
+  }
 }
 
 simple_table <- function(header, rows, right = integer()) {
@@ -203,16 +227,23 @@ bark_subtotal <- function(imports, lines, stat_years) {
 
 pathway_block_ui <- function(p, r, cn8_table, settings) {
   head <- shiny::h5(class = "mt-3", pathway_label(p))
+  listed <- if (nrow(r$commodities %||% data.frame()) > 0) r$commodities[r$commodities$pathway %in% p, ] else NULL
+  listed_txt <- if (!is.null(listed) && nrow(listed) > 0) paste0("EPPO lists: ", paste(unique(paste0(listed$category, " (", listed$host, ")")),
+                                                                  collapse = "; "), ". ") else ""
   if (pathway_type(p) == "manual") {
-    return(shiny::tagList(head, shiny::div(class = "alert alert-secondary py-2", "Not computed in v1. Assess manually.")))
+    return(shiny::tagList(head, shiny::div(class = "alert alert-secondary py-2", listed_txt, "Not computed in v1. Assess manually.")))
+  }
+  if (is.null(pinfo(r, p))) {
+    return(shiny::tagList(head, shiny::div(class = "alert alert-secondary py-2",
+      "EPPO lists no host commodity of this pathway for the pest. Not assessed.")))
   }
   cl <- r$classes[r$classes$pathway == p, ]
   stat_years <- utils::tail(r$years, settings$volume_n)
-  lines <- cn8_lines(cn8_table, p, r$groups, r$monocot, r$host_genera)
+  lines <- pathway_lines(cn8_table, p, pinfo(r, p))
   total <- cl$kg[cl$role == "ent3"]
   bark <- if (p == "wood") bark_subtotal(r$imports, lines, stat_years) else NA
   shiny::tagList(
-    head, class_rows_ui(cl),
+    head, shiny::p(class = "small text-muted", pathway_basis(p, r)), class_rows_ui(cl),
     present_ui(r, lines, stat_years, total),
     shiny::tags$details(open = NA, shiny::tags$summary(paste0("CN8 lines in this pathway (median kg/year ",
                                                                min(stat_years), "-", max(stat_years), ")")),

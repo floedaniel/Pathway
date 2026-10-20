@@ -37,7 +37,8 @@ test_that("manual pathways only: no SSB call, no classes, empty draft", {
   local_eppo_mock()  # SSB requests would hit the mock and fail with 400
   s <- test_settings()
   withr::local_dir(root)  # pipeline reads data/ relative to the project root
-  r <- run_assessment("IPSXCA", s, pathways = "seeds", cn8_table = cn8_table, law_index_fn = law_fixture_idx)
+  r <- run_assessment("IPSXCA", s, pathways = "seeds", cn8_table = cn8_table, law_index_fn = law_fixture_idx,
+                      commodities_fn = function(code, settings) parse_host_commodities(""))
   expect_null(r$imports)
   expect_null(r$classes)
   expect_equal(generate_writeup(r, "seeds", s)$text, "")

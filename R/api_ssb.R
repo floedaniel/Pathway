@@ -97,10 +97,16 @@ read_commodity_cn8 <- function(file = "data/commodity_cn8.csv") {
 # A genus-specific line (column `genus`, e.g. birch round wood) counts only when a
 # host of its group is in that genus; a residual line (`excludes_genera`, e.g.
 # "other broadleaved") counts only when a host genus of its group is outside the list.
-cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera = NULL) {
+# categories: EPPO host-commodity categories listed for the pest (NULL = no filter);
+# a line counts only when one of its `eppo_category` values is listed.
+cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera = NULL, categories = NULL) {
   g <- cn8_table$commodity_group
   keep <- g %in% groups | (g == "both" & length(groups) > 0) |
     (g == "monocot" & monocot & "non_conifer" %in% groups)
+  if (!is.null(categories)) {
+    keep <- keep & vapply(strsplit(cn8_table$eppo_category %||% rep("", nrow(cn8_table)), ";"),
+                          function(cc) any(cc %in% categories), logical(1))
+  }
   x <- cn8_table[cn8_table$pathway == pathway & keep, ]
   if (is.null(host_genera) || nrow(x) == 0) return(x)
   split_genera <- function(s) if (is.na(s) || !nzchar(s)) character() else strsplit(s, ";")[[1]]
@@ -121,10 +127,17 @@ cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera =
   x[ok, ]
 }
 
+# CN8 lines for a pathway from its host selection `info` (see pathway_info() in
+# R/pipeline.R); `group` restricts to one host group.
+pathway_lines <- function(cn8_table, pathway, info, group = NULL) {
+  cn8_lines(cn8_table, pathway, group %||% info$groups, isTRUE(info$monocot), info$host_genera, info$categories)
+}
+
 # Host genera (and their families, for lines that name a family such as palms)
 # per group for cn8_lines(); NULL for a group where some host has no genus in its
 # lineage (e.g. a family-level host), so that group is not filtered.
 host_genera_by_group <- function(classified) {
+  if (any(classified$host_class == "all_plants")) return(list(conifer = NULL, non_conifer = NULL))
   out <- lapply(c(conifer = "conifer", non_conifer = "non_conifer"), function(g) {
     sel <- classified$host_class == g
     gen <- classified$genus[sel]

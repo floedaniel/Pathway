@@ -49,5 +49,16 @@ for (pest in survey_pests) {
 # Error/edge cases for stop-condition tests
 fetch_and_save("taxons/taxon/NOSUCH/overview")
 
+# Host-commodity pages (gd.eppo.int) and the taxonomy of their hosts
+gd_dir <- "tests/testthat/fixtures/eppo_gd"
+dir.create(gd_dir, recursive = TRUE, showWarnings = FALSE)
+for (pest in c(fixture_pests, "AGRLAX")) {
+  html <- eppo_gd_fetch(pest) %||% ""
+  writeLines(html, file.path(gd_dir, paste0(pest, "_pathwayshosts.html")), useBytes = TRUE)
+  for (h in unique(parse_host_commodities(html)$host_code)) fetch_and_save(file.path("taxons/taxon", h, "taxonomy"))
+}
+for (ep in c("overview", "distribution", "names", "hosts")) fetch_and_save(file.path("taxons/taxon/AGRLAX", ep))
+for (h in fetch_and_save("taxons/taxon/AGRLAX/hosts")$eppocode) fetch_and_save(file.path("taxons/taxon", h, "taxonomy"))
+
 out <- commandArgs(trailingOnly = TRUE)[1]
 if (!is.na(out)) write.csv(do.call(rbind, survey), out, row.names = FALSE)

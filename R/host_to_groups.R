@@ -10,6 +10,7 @@ host_to_groups <- function(host_class) {
 
 # classified: output of classify_hosts(). Returns the union of groups, or stops.
 run_groups <- function(classified) {
+  if (any(classified$host_class == "all_plants")) return(commodity_groups)  # "plants" (2PLAN)
   groups <- host_to_groups(unique(classified$host_class))
   if (length(groups) == 0) stop_app("no_plant_hosts")
   groups

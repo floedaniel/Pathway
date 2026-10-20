@@ -2,6 +2,7 @@ thr <- read_thresholds(file.path(root, "data", "finnprio_thresholds.csv"))
 star <- threshold_for(thr, "conifer")
 yrs <- 2016:2025
 cfg <- list(volume_stat = "median", volume_n = 10)
+info_of <- function(groups) list(groups = groups, monocot = FALSE, host_genera = NULL, categories = NULL)
 
 imp <- function(cn8, country, year, kg) {
   tibble::tibble(cn8 = cn8, country = country, year = as.integer(year), kg = kg, value_nok = 0)
@@ -62,7 +63,7 @@ test_that("years without imports count as zero", {
 test_that("output is tidy: one row per group, one value per column", {
   cn8 <- data.frame(pathway = "wood", cn8 = c("C", "B"), commodity_group = c("conifer", "both"))
   d <- rbind(imp("C", "DE", yrs, 1e5), imp("B", "DE", yrs, 1e5))
-  res <- classify_pathway(d, cn8, "wood", c("conifer", "non_conifer"), character(), cfg, yrs, thr)
+  res <- classify_pathway(d, cn8, "wood", info_of(c("conifer", "non_conifer")), character(), cfg, yrs, thr)
   expect_equal(names(res), c("pathway", "group", "role", "stat", "years", "kg", "class",
                              "kg_pest_present", "share_pest_present"))
   expect_equal(nrow(res), 3)
@@ -72,7 +73,7 @@ test_that("output is tidy: one row per group, one value per column", {
 test_that("'both' lines count once per group; all_hosts is the union", {
   cn8 <- data.frame(pathway = "wood", cn8 = c("C", "B"), commodity_group = c("conifer", "both"))
   d <- rbind(imp("C", "DE", yrs, 1e5), imp("B", "DE", yrs, 1e5))
-  res <- classify_pathway(d, cn8, "wood", c("conifer", "non_conifer"), character(), cfg, yrs, thr)
+  res <- classify_pathway(d, cn8, "wood", info_of(c("conifer", "non_conifer")), character(), cfg, yrs, thr)
   expect_equal(res$kg[res$group == "conifer"], 2e5)
   expect_equal(res$kg[res$group == "non_conifer"], 1e5)
   expect_equal(res$kg[res$group == "all_hosts"], 2e5)

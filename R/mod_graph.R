@@ -3,11 +3,12 @@
 # all countries (pest-present ones marked "*") or pest-present countries only.
 # ggplot2 + viridis.
 
-graph_data <- function(imports, cn8_table, pathway, groups, years, present, country_names = character(),
-                       top_n = 6, monocot = FALSE, host_genera = NULL, origins = c("all", "present")) {
+# info: the pathway's host selection (pinfo(r, pathway)).
+graph_data <- function(imports, cn8_table, pathway, info, years, present, country_names = character(),
+                       top_n = 6, origins = c("all", "present")) {
   origins <- match.arg(origins)
-  rows <- lapply(groups, function(g) {
-    lines <- cn8_lines(cn8_table, pathway, g, monocot, host_genera)
+  rows <- lapply(info$groups, function(g) {
+    lines <- pathway_lines(cn8_table, pathway, info, g)
     x <- imports[imports$cn8 %in% lines$cn8 & imports$year %in% years, ]
     if (origins == "present") x <- x[x$country %in% present, ]
     if (nrow(x) == 0) return(NULL)
@@ -57,7 +58,7 @@ mod_graph_ui <- function(id) {
 
 mod_graph_server <- function(id, result, pathways, cn8_table) {
   shiny::moduleServer(id, function(input, output, session) {
-    shown <- shiny::reactive(intersect(pathways(), computed_pathways))
+    shown <- shiny::reactive(intersect(pathways(), names(result()$pathway_info %||% list())))
     output$choose <- shiny::renderUI({
       p <- shown()
       if (length(p) > 1) shiny::radioButtons(session$ns("pathway"), NULL, inline = TRUE,
@@ -72,8 +73,8 @@ mod_graph_server <- function(id, result, pathways, cn8_table) {
       r <- result()
       shiny::req(is.list(r), !inherits(r, "condition"))
       origins <- input$origins %||% "all"
-      d <- graph_data(r$imports, cn8_table, pathway(), r$groups, r$years, r$present_countries,
-                      r$country_names, monocot = r$monocot, host_genera = r$host_genera, origins = origins)
+      d <- graph_data(r$imports, cn8_table, pathway(), pinfo(r, pathway()), r$years, r$present_countries,
+                      r$country_names, origins = origins)
       shiny::validate(shiny::need(nrow(d) > 0, if (origins == "present")
         "No recorded imports from countries where the pest is present." else "No imports recorded for this pathway."))
       graph_plot(d, paste0(r$pest, ": imports, ", pathway_label(pathway()),

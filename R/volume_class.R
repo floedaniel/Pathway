@@ -64,10 +64,12 @@ classify_volume <- function(imports, lines, group, stat = "median", years, volum
 # All rows for one pathway. "all_hosts" = total over the union of the selected
 # lines (each CN8 line once): the pathway's ENT3 answer (role "ent3"). Per-group
 # rows (conifer, non_conifer) are information (role "info").
-classify_pathway <- function(imports, cn8_table, pathway, groups, present_countries, settings,
-                             years, thresholds = read_thresholds(), monocot = FALSE, host_genera = NULL) {
-  rows <- lapply(c("all_hosts", groups), function(g) {
-    lines <- cn8_lines(cn8_table, pathway, if (g == "all_hosts") groups else g, monocot, host_genera)
+# info: the pathway's host selection, see pathway_info() in R/pipeline.R
+# (groups, monocot, host_genera, categories).
+classify_pathway <- function(imports, cn8_table, pathway, info, present_countries, settings,
+                             years, thresholds = read_thresholds()) {
+  rows <- lapply(c("all_hosts", info$groups), function(g) {
+    lines <- pathway_lines(cn8_table, pathway, info, if (g == "all_hosts") NULL else g)
     classify_volume(imports, lines, g, settings$volume_stat, years, settings$volume_n,
                     present_countries, thresholds)
   })

@@ -42,7 +42,7 @@ pathway_scope <- function(pathway, lines) {
 # pest-present imports per country and line.
 writeup_inputs <- function(r, pathway, cn8_table = read_commodity_cn8()) {
   ent3 <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3", ]
-  lines <- cn8_lines(cn8_table, pathway, r$groups, r$monocot, r$host_genera)
+  lines <- pathway_lines(cn8_table, pathway, pinfo(r, pathway))
   span <- as.integer(strsplit(ent3$years, "-")[[1]])
   yrs <- seq(span[1], span[2])
   list(
@@ -78,7 +78,9 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   out <- c(out, paste0("Annual import into Norway of ", pathway_scope(pathway, inputs$lines_used), ": ",
                        fmt_mass(ent3$kg), " (", ent3$stat, " ", ent3$years, "). The figure covers all ",
                        if (pathway == "wood") "products" else "plants", " in these CN lines, not only host ",
-                       if (pathway == "wood") "commodities" else "plants", ", so it is an upper bound."), "")
+                       if (pathway == "wood") "commodities" else "plants", ", so it is an upper bound."))
+  basis <- if (!is.null(r$pathway_info)) pathway_basis(pathway, r) else NULL
+  out <- c(out, if (!is.null(basis)) basis, "")
 
   top <- if (is.null(ls)) ls else utils::head(ls[ls$kg > 0, ], 5)
   if (!is.null(top) && nrow(top) > 0) {
@@ -150,6 +152,7 @@ regulation_fallback <- function(units) {
 # fallback. Returns list(text, source, problems).
 generate_writeup <- function(r, pathway, settings, ask = llm_ask, nonce = 0, inputs = NULL) {
   if (pathway_type(pathway) == "manual") return(list(text = "", source = "manual", problems = character()))
+  if (is.null(inputs) && is.null(pinfo(r, pathway))) return(list(text = "", source = "not listed", problems = character()))
   if (is.null(inputs)) inputs <- writeup_inputs(r, pathway)
   units <- regulation_units(r)
   if (is.null(units) || nrow(units) == 0) {

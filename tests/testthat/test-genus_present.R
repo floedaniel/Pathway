@@ -82,10 +82,10 @@ test_that("pest-present table lists every present country, also without imports"
 test_that("graph stacks the largest origin at the bottom (last factor level), Other on top", {
   imp <- tibble::tibble(cn8 = "06029098_2016", country = c("NL", "DK", "SE", "NL"), year = 2025L,
                         kg = c(1000, 10, 100, 1000), value_nok = 0)
-  d <- graph_data(imp, cn8_table, "plants_for_planting", "conifer", 2025L, present = "DK", top_n = 2)
+  d <- graph_data(imp, cn8_table, "plants_for_planting", list(groups = "conifer"), 2025L, present = "DK", top_n = 2)
   lv <- levels(d$origin)
   expect_equal(lv[1], "Other")
   expect_equal(lv[length(lv)], "NL")
-  dp <- graph_data(imp, cn8_table, "plants_for_planting", "conifer", 2025L, present = "DK", origins = "present")
+  dp <- graph_data(imp, cn8_table, "plants_for_planting", list(groups = "conifer"), 2025L, present = "DK", origins = "present")
   expect_equal(unique(as.character(dp$origin)), "DK")
 })

@@ -20,7 +20,11 @@ lineage_rank <- function(tax, type) {
 }
 
 classify_host <- function(tax) {
-  host_class <- if (any(tax$prefname %in% conifer_taxa)) {
+  # EPPO's non-taxonomic commodity group "plants" (2PLAN) in host-commodity lists
+  all_plants <- any(tax$prefname == "Commodity groups") && any(tolower(tax$prefname) == "plants")
+  host_class <- if (all_plants) {
+    "all_plants"
+  } else if (any(tax$prefname %in% conifer_taxa)) {
     "conifer"
   } else if (lineage_rank(tax, "Kingdom") %in% plant_kingdoms) {
     "non_conifer"

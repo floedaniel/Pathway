@@ -47,23 +47,21 @@ ui <- bslib::page_sidebar(
 server <- function(input, output, session) {
   inp <- mod_input_server("input", settings)
 
-  # Run computes both data pathways (cached), so the pathway selection can change
-  # afterwards without a new run.
+  # One input (EPPO code or scientific name). Pathways come from the EPPO
+  # host-commodity list (or host plants when EPPO has none); the checkboxes are
+  # then set to them and can be used to hide pathways.
   result <- eventReactive(inp$run(), {
-    code <- inp$code()
-    req(nzchar(code))
-    withProgress(message = paste("Running", code), value = 0.3, {
-      tryCatch({
-        validate_pathways(inp$pathways())
-        run_assessment(code, settings, pathways = computed_pathways, cn8_table = cn8_table)
-      }, pathwise_stop = function(e) e, pathwise_api_error = function(e) e)
+    input_text <- inp$code()
+    req(nzchar(input_text))
+    withProgress(message = paste("Running", input_text), value = 0.3, {
+      tryCatch(run_assessment(input_text, settings, cn8_table = cn8_table),
+               pathwise_stop = function(e) e, pathwise_api_error = function(e) e)
     })
   })
 
-  # Pre-select plants_for_planting, and wood when a conifer host is present
   observeEvent(result(), {
     r <- result()
-    if (is.list(r) && !inherits(r, "condition")) inp$preselect(r$groups)
+    if (is.list(r) && !inherits(r, "condition")) inp$preselect(r$pathways)
   })
 
   shown_pathways <- reactive(inp$pathways())
@@ -82,19 +80,29 @@ server <- function(input, output, session) {
     n <- table(factor(r$hosts$host_class, c("conifer", "non_conifer", "not_plant")))
     div(class = "d-flex flex-wrap gap-3 border rounded p-2 mb-2 small",
       span(tags$b(r$pest), " (", r$code, ")"),
-      span("Groups: ", paste(r$groups, collapse = ", ")),
+      span("Pathways from: ", if (r$pathway_source == "eppo_commodities")
+        paste0("EPPO host commodities (", nrow(r$commodities), " entries)") else "host plants (EPPO lists no host commodities)"),
       span("Hosts: ", n[["conifer"]], " conifer, ", n[["non_conifer"]], " non-conifer",
            if (n[["not_plant"]] > 0) paste0(", ", n[["not_plant"]], " not plants")),
       span("Present in ", length(r$present_countries), " countries"),
-      span("Years ", min(r$years), "-", max(r$years)))
+      if (!is.null(r$years)) span("Years ", min(r$years), "-", max(r$years)))
   })
 
   output$derived <- renderUI({
     r <- result()
     req(is.list(r), !inherits(r, "condition"))
     h <- r$hosts
+    cm <- r$commodities
     tagList(
       p(tags$b("Present countries: "), paste(sort(r$present_countries), collapse = ", ")),
+      if (nrow(cm) > 0) tagList(
+        h6("EPPO host commodities (gd.eppo.int)"),
+        tags$table(class = "table table-sm",
+          tags$thead(tags$tr(tags$th("EPPO category"), tags$th("Host"), tags$th("EPPO"), tags$th("FinnPRIO pathway"), tags$th("Status"))),
+          tags$tbody(lapply(seq_len(nrow(cm)), function(i) tags$tr(
+            tags$td(cm$category[i]), tags$td(cm$host[i]), tags$td(cm$host_code[i]),
+            tags$td(cm$pathway[i] %||% ""), tags$td(cm$status[i])))))),
+      h6("Host plants (Major host, Host)"),
       tags$table(class = "table table-sm",
         tags$thead(tags$tr(tags$th("Host"), tags$th("EPPO"), tags$th("Class"), tags$th("Family"), tags$th("Group"))),
         tags$tbody(lapply(seq_len(nrow(h)), function(i) tags$tr(
@@ -107,8 +115,10 @@ server <- function(input, output, session) {
     r <- result()
     req(is.list(r), !inherits(r, "condition"))
     f <- function(x) format(x, "%Y-%m-%d")
-    paste0("Fetched: EPPO ", f(r$fetched$eppo), ", SSB ", f(r$fetched$ssb),
-           " (table 08801 updated ", substr(r$fetched$ssb_table_updated, 1, 10), "), Lovdata ", f(r$fetched$lovdata),
+    paste0("Fetched: EPPO ", f(r$fetched$eppo),
+           if (!is.null(r$fetched$ssb)) paste0(", SSB ", f(r$fetched$ssb), " (table 08801 updated ",
+                                              substr(r$fetched$ssb_table_updated, 1, 10), ")"),
+           ", Lovdata ", f(r$fetched$lovdata),
            ". Thresholds reviewed ", read_thresholds()$reviewed[1], ".")
   })
 

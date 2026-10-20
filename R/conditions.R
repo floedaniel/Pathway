@@ -3,7 +3,7 @@
 # The server catches "pathwise_stop" and shows one alert replacing all panels.
 
 stop_messages <- c(
-  invalid_code      = "Unknown or non-pest EPPO code.",
+  invalid_code      = "Unknown or non-pest EPPO code or name.",
   no_hosts          = "No hosts registered in EPPO for {code}. No assessment possible.",
   no_main_minor     = "No major hosts or hosts registered (other EPPO host classes are not used).",
   no_plant_hosts    = "No plant hosts among the selected EPPO hosts.",

@@ -1,4 +1,6 @@
-# Input: EPPO code + Run, FinnPRIO pathway selector (max 5), name -> code helper.
+# Input: one field, EPPO code or scientific name, and Run. Pathways are set from
+# the EPPO host-commodity list after each run (or from host plants when EPPO has
+# no list); the checkboxes are an override.
 
 pathway_choice_list <- function() {
   stats::setNames(finnprio_pathways$id,
@@ -9,41 +11,22 @@ pathway_choice_list <- function() {
 mod_input_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
-    shiny::textInput(ns("code"), "EPPO code", placeholder = "e.g. IPSXCA"),
+    shiny::textInput(ns("code"), "EPPO code or scientific name", placeholder = "e.g. AGRLAX or Agrilus anxius"),
     shiny::actionButton(ns("run"), "Run", class = "btn-primary w-100"),
     shiny::hr(),
-    shiny::checkboxGroupInput(ns("pathways"), "Pathways",
-                              choices = pathway_choice_list(), selected = "plants_for_planting"),
-    shiny::uiOutput(ns("pathway_msg")),
-    shiny::hr(),
-    shiny::textInput(ns("name"), "Find code by name", placeholder = "e.g. Ips typographus"),
-    shiny::actionButton(ns("lookup"), "Look up", class = "btn-sm btn-outline-secondary"),
-    shiny::uiOutput(ns("lookup_result"))
+    shiny::checkboxGroupInput(ns("pathways"), "Pathways (set from EPPO after Run)",
+                              choices = pathway_choice_list(), selected = character())
   )
 }
 
 mod_input_server <- function(id, settings) {
   shiny::moduleServer(id, function(input, output, session) {
-    output$lookup_result <- shiny::renderUI({
-      shiny::req(input$lookup > 0)
-      name <- shiny::isolate(trimws(input$name))
-      shiny::req(nzchar(name))
-      codes <- tryCatch(eppo_name2codes(name, settings), error = function(e) NULL)
-      if (is.null(codes) || nrow(codes) == 0) return(shiny::p(class = "small text-muted", "No EPPO code found."))
-      shiny::p(class = "small", "EPPO code: ", shiny::tags$b(paste(codes$eppocode, collapse = ", ")))
-    })
-    output$pathway_msg <- shiny::renderUI({
-      msg <- tryCatch({ validate_pathways(input$pathways); NULL }, pathwise_stop = conditionMessage)
-      if (!is.null(msg)) shiny::div(class = "text-danger small", msg)
-    })
     list(
       run = shiny::reactive(input$run),
-      code = shiny::reactive(toupper(trimws(input$code))),
+      code = shiny::reactive(trimws(input$code)),
       pathways = shiny::reactive(input$pathways %||% character()),
-      # Pre-select defaults after a run, keeping the user's picks
-      preselect = function(groups) {
-        shiny::updateCheckboxGroupInput(session, "pathways", selected = union(input$pathways, default_pathways(groups)))
-      }
+      # After a run: select the pathways derived for the pest
+      preselect = function(pathways) shiny::updateCheckboxGroupInput(session, "pathways", selected = pathways)
     )
   })
 }

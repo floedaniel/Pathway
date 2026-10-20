@@ -24,7 +24,7 @@ The app stops at start with a clear message if a needed key is missing. SSB and 
 
 ## What you see
 
-Type an EPPO code or a scientific name (e.g. `AGRLAX` or `Agrilus anxius`) and press **Run**. The pathways are chosen automatically from the EPPO host-commodity list; the checkboxes can hide pathways afterwards.
+Type an EPPO code or a scientific name (e.g. `AGRLAX` or `Agrilus anxius`) and press **Run**. The pathways are chosen automatically from the EPPO host-commodity list (or from host plants when EPPO has no list); there is nothing else to choose.
 
 * **Header:** pest, host groups, number of hosts, number of countries where the pest is present, years.
 * **Panel 1, SSB table:** one block per pathway. The first row, *All host commodities (ENT3)*, gives the median annual import in kg over 10 years and its FinnPRIO class (`small`, `medium`, `large`). Beside it: the kg imported from countries where the pest is present, and its share (context only, not ENT3). Warnings explain where the class is an upper bound. Top origins are listed below.

@@ -20,11 +20,11 @@ document.addEventListener('click', function (e) {
   });
 });"))
 
-ui <- bslib::page_sidebar(
+ui <- bslib::page_fluid(
   title = "Pathwise: FinnPRIO ENT3 import volume",
   theme = bslib::bs_theme(version = 5),
-  sidebar = bslib::sidebar(mod_input_ui("input"), width = 280),
   copy_js,
+  mod_input_ui("input"),
   uiOutput("header"),
   uiOutput("stop"),
   conditionalPanel(
@@ -40,7 +40,7 @@ ui <- bslib::page_sidebar(
   ),
   tags$footer(class = "small text-muted mt-3",
     p("Import statistics show recorded trade, not pest pressure or entry. CN8 lines cover whole commodity groups, ",
-      "so classes are an upper bound for host-specific volume. Classes assume the selected pathway."),
+      "so classes are an upper bound for host-specific volume. Pathways come from the EPPO host-commodity list."),
     textOutput("fetch_dates"))
 )
 
@@ -48,8 +48,7 @@ server <- function(input, output, session) {
   inp <- mod_input_server("input", settings)
 
   # One input (EPPO code or scientific name). Pathways come from the EPPO
-  # host-commodity list (or host plants when EPPO has none); the checkboxes are
-  # then set to them and can be used to hide pathways.
+  # host-commodity list (or host plants when EPPO has none).
   result <- eventReactive(inp$run(), {
     input_text <- inp$code()
     req(nzchar(input_text))
@@ -59,12 +58,10 @@ server <- function(input, output, session) {
     })
   })
 
-  observeEvent(result(), {
+  shown_pathways <- reactive({
     r <- result()
-    if (is.list(r) && !inherits(r, "condition")) inp$preselect(r$pathways)
+    if (is.list(r) && !inherits(r, "condition")) r$pathways else character()
   })
-
-  shown_pathways <- reactive(inp$pathways())
 
   output$has_result <- reactive(is.list(result()) && !inherits(result(), "condition"))
   outputOptions(output, "has_result", suspendWhenHidden = FALSE)

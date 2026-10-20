@@ -32,3 +32,7 @@ data/law/raw/
 # Plot / table exports
 *.png
 !docs/**/*.png
+
+# Local key folder (never commit)
+API_kays/
+API_keys/

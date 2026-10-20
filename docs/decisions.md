@@ -23,3 +23,7 @@ Amendments to the plan in `Pathwise_notes.Rmd`. Newer entries win.
 11. **Statistic.** Median over 10 years (`volume_stat: median`, `volume_n: 10`); trade data are skewed.
 12. **Write-up.** ENT3 only, no other FinnPRIO fields. English. Max 200 characters (to be tested).
 13. **Two pathways.** Plants for planting (0602) and wood (ch 44: 4401, 4403, 4404, 4406, 4407, 4415), each with conifer/broadleaf groups, in `commodity_cn8.csv` (`pathway` column). Agglomerated wood (pellets, briquettes) excluded. 0602 has no conifer-specific line in 2016-2025, so conifer plants for planting are only in catch-all lines.
+14. **CN8 review applied (no manual review for now).** `commodity_cn8.csv` has `role` (class|info) and `flags` (upper_bound, waste, treated, tropical, with_bark, debarked). Ambiguous lines stay in with `upper_bound`; wood waste and treated wood are info rows; 06029092 is out (v2). With-bark subtotal is info only. Wood uses Q1 kg only.
+15. **Pathway selector.** One ENT3 class and one write-up per pathway; default plants for planting. Write-up: class, number with unit, statistic with years, one Lovdata id; no sources line.
+16. **EPPO host classes.** API v2 has no "Minor host"; `host_classes: [Major host, Host]` (pending confirmation).
+17. **Angiosperm class name.** EPPO v2 lineage uses "Angiospermae"; broadleaf = Angiospermae AND woody in `woody_taxa.csv` (draft list used unreviewed for now, `woody_use_unreviewed: true`).

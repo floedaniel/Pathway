@@ -5,7 +5,7 @@
 stop_messages <- c(
   invalid_code      = "Unknown or non-pest EPPO code.",
   no_hosts          = "No hosts registered in EPPO for {code}. No assessment possible.",
-  no_main_minor     = "No main or minor hosts registered.",
+  no_main_minor     = "No major hosts or hosts registered (other EPPO host classes are not used).",
   unreviewed_hosts  = "No reviewed woody hosts. Unreviewed: {hosts}. Add to woody_taxa.csv.",
   no_groups         = "No hosts covered by current commodity groups (v1: woody plants).",
   no_distribution   = "No present-country records in EPPO.",

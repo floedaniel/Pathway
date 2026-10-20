@@ -210,6 +210,41 @@ https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
 - Unknown codes return HTTP 400.
 - Test pests, live: IPSXCA, DENCPO, POLGPR conifer; AROMBU, CERAFP, LYMAMA broadleaf; GIBBCI, PHYTRA, XYLEFA both; no unreviewed hosts left. PHYTIN has no present-country records in EPPO, so it serves as the "no distribution" test (its only host, potato, is not woody).
 
+
+## Findings from Lovdata (2026-10-20)
+- FOR-2000-12-01-1333 comes from the public bulk archive (21 MB, no key, updated daily). Parsed into 305 citable units: § articles, annex table rows (e.g. "Vedlegg 2, nr. 10"), annex paragraphs. Deep links to lovdata.no/dokument/SF/forskrift/2000-12-01-1333/...
+- Bark beetles are regulated as "Scolytidae spp. (ikke-europeiske arter)" (Vedlegg 2, nr. 10). EPPO calls the group Scolytinae, so `data/law_taxon_aliases.csv` maps Scolytinae -> Scolytidae and conifers -> Coniferales / bartrær.
+- Not mentioned in the regulation: Xylella, Aromia, Lymantria, Dendroctonus, Polygraphus, Fusarium circinatum. The write-up will say "not found" for these.
+- Vedlegg 5A lists tariff codes (e.g. 44.15.20) that need a phytosanitary certificate; could later be linked to the CN8 lines.
+
 ## Open questions for me
-1. **Host classes.** Plan said main + minor; v2 has no "Minor host". I use **Major host + Host** (config `host_classes`). Should Alternate (e.g. rust alternate hosts) or Wild/Weed also count?
-2. **How the app gets EPPO_KEY.** The app reads env vars only (your rule). With the key in `API_kays/EPPO_beta.txt`, either (a) you add it to `C:\Users\dafl\OneDrive - Folkehelseinstituttet\Documents\.Renviron`, or (b) the app falls back to reading `API_kays/EPPO_beta.txt` when EPPO_KEY is unset (also needed on the deploy laptop). Which?
+1. **Host classes.** dont use 
+
+2.  no manual review. Here is the rule, and what the regulation does and doesn't settle.
+
+**Taxonomic rule (programmatic, no reviewed list)**
+- **Conifer:** the host lineage contains Pinopsida or Pinales. The regulation calls this group *Coniferales*, so treat those as synonyms.
+- **Non-conifer:** every other plant host (Viridiplantae). Drop the word "broadleaf", because the rule doesn't test for it.
+- **Cycads, Ginkgo, ferns:** classify as non-conifer. There is no special case.
+- **Drop `woody_taxa.csv`** and the "unreviewed" and "no reviewed woody hosts" stops. A host that isn't a plant at all (e.g. a fungal "host") still gives a "no plant hosts" stop.
+- **Woody filter not needed for plants for planting:** herbaceous plants are plants for planting too, and 0602 covers them. Only the wood pathway would need a woody test, and taxonomy can't give one. So wood for non-conifers is shown as an upper bound with a flag.
+
+**What the regulation gives you**
+Vedlegg 5A nr 8 defines the wood pathway by commodity. Use it as the legal scope for the wood lines, which settles most of the earlier CN8 questions:
+- **Included:** firewood, chips and spon (conifer and non-conifer separately), sawdust and wood waste, round wood, split posts, untreated sleepers, sawn timber over 6 mm, wooden packaging and pallets, prefabricated wooden houses.
+- **Impregnated wood is out:** the sleeper line covers untreated only.
+- **Tropical hardwood is out of the "other" lines:** the "other than conifer" lines for round wood and sawn timber exclude tropical species. Don't count it as non-conifer.
+- **Split used by the regulation:** conifer, oak, other. Vedlegg 4A pt 32 also uses "deciduous trees and shrubs", but that is a habit category, so don't use it for classification.
+
+**Limits**
+- **The tariff numbers in the regulation are the old format** (e.g. 44.03.20), last amended in 2016. Don't copy them into the CSV. Claude Code should match each line's wording to the current CN8 labels in the SSB metadata and write the result to the CSV with its source, so you review a short mapping, not a taxonomy.
+- **The regulation can't fix the crude CN8 for plants.** It regulates "plants and propagating material" without genus-level volumes. The class stays an upper bound.
+- **A finer source exists in principle:** importers must notify Mattilsynet of consignment contents (§23a), and certificates give scientific names and quantities (§20). Mattilsynet holds genus-level import data. That is a data request, not a v1 task.
+- **Heads-up for Panel 3:** Vedlegg 2 lists host genera per pest, and Vedlegg 3 and 4A list origin-specific bans. The Lovdata search should match on both pest name and host genus.
+
+**Plan changes**
+- **Groups:** `conifer`, `non_conifer`, and per pathway `plants_for_planting`, `wood`.
+- **Wood pathway:** filter by the regulation's scope, with `tropical` excluded and `impregnated` excluded.
+- **Write-up pathway selector:** default plants for planting, as decided earlier.
+- **Tests:** a conifer-only pest, a non-conifer pest, a mixed pest, and a non-plant host.
+

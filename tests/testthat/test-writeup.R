@@ -12,9 +12,10 @@ fake_result <- function(law_ids = c("Vedlegg 2, nr. 10", "Vedlegg 3, nr. 1.2", "
                          pest_match = pest_match, origin_rule = origin_rule)
   )
 }
-fake_present <- tibble::tibble(country = c("US", "MX"), name = c("United States of America (US)", "Mexico (MX)"),
+fake_present <- tibble::tibble(country = c("US", "MX"), name = c("United States of America", "Mexico"),
                                kg = c(4.3e5, 0), share = c(3e-4, 0), value_nok = 0,
-                               years_with_imports = c(10L, 0L), main_commodity = c("44071121 Trelast av furu", NA))
+                               years_with_imports = c(10L, 0L), main_cn8 = c("44071121", NA),
+                               main_description = c("Trelast av furu", NA))
 fake_inputs <- list(
   lines_used = data.frame(cn8 = c("44071121_2017", "44152000_2001")),
   lines = tibble::tibble(cn8 = c("44071121_2017", "44152000_2001"), code = c("44071121", "44152000"),

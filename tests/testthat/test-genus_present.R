@@ -74,7 +74,9 @@ test_that("pest-present table lists every present country, also without imports"
   expect_equal(po$country, c("US", "CA"))
   expect_equal(po$kg, c(200, 0))
   expect_equal(po$years_with_imports, c(2L, 0L))
-  expect_equal(po$main_commodity[1], "A Trelast av bjørk")
+  expect_equal(po$main_cn8[1], "A")
+  expect_equal(po$main_description[1], "Trelast av bjørk")
+  expect_equal(po$name, c("USA", "CA"))
 })
 
 test_that("graph stacks the largest origin at the bottom (last factor level), Other on top", {

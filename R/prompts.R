@@ -91,7 +91,7 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   pr <- inputs$present
   pl <- inputs$present_lines
   for (i in seq_len(nrow(pr))) {
-    nm <- sub(" \\([A-Z0-9_]+\\)$", "", pr$name[i])
+    nm <- pr$name[i]
     if (pr$kg[i] > 0 || any(pl$country == pr$country[i])) {
       x <- utils::head(pl[pl$country == pr$country[i], ], 3)
       detail <- if (nrow(x) > 0) paste0("; CN8 lines, total ", ent3$years, ": ",

@@ -17,9 +17,10 @@ class_badge <- function(label, official = TRUE) {
   shiny::span(class = paste0("badge text-bg-", colour, if (!official) " opacity-75"), label)
 }
 
-country_label <- function(code, country_names) {
+# Country name from SSB (English); the ISO2 code if SSB has no name.
+country_name <- function(code, country_names) {
   nm <- unname(country_names[code])
-  ifelse(is.na(nm), code, paste0(nm, " (", code, ")"))
+  ifelse(is.na(nm), code, nm)
 }
 
 # Per-country median annual kg and NOK over the statistic years (zero years included).
@@ -37,10 +38,10 @@ country_medians <- function(imports, lines, stat_years) {
 # CN8 code without SSB's version suffix ("06029021_2011" -> "06029021").
 cn8_code <- function(x) sub("_.*$", "", x)
 
-# "06029021 Buksbom, drake-, ..." (description cut to `width` characters)
-cn8_label <- function(cn8, lines, width = 80) {
+# SSB description of a CN8 line (cut to `width` characters for display).
+cn8_description <- function(cn8, lines, width = Inf) {
   d <- lines$description[match(cn8, lines$cn8)]
-  ifelse(is.na(cn8), NA, paste0(cn8_code(cn8), " ", substr(d, 1, width), ifelse(nchar(d) > width, "...", "")))
+  ifelse(is.na(d), NA, ifelse(nchar(d) > width, paste0(substr(d, 1, width), "..."), d))
 }
 
 # Largest CN8 line per country over the statistic years.
@@ -86,10 +87,12 @@ present_by_line <- function(imports, lines, stat_years, present) {
 origin_summary <- function(imports, lines, stat_years, present, country_names = character(), top_n = 10) {
   m <- country_medians(imports, lines, stat_years)
   m <- m[m$kg > 0 | m$value_nok > 0, ]
-  m$name <- country_label(m$country, country_names)
+  m$name <- country_name(m$country, country_names)
   m$pest_present <- m$country %in% present
-  m$main_line <- unname(cn8_label(main_line_by_country(imports, lines, stat_years)[m$country], lines, 60))
-  utils::head(m[order(-m$kg), c("country", "name", "kg", "value_nok", "pest_present", "main_line")], top_n)
+  main <- unname(main_line_by_country(imports, lines, stat_years)[m$country])
+  m$main_cn8 <- cn8_code(main)
+  m$main_description <- cn8_description(main, lines)
+  utils::head(m[order(-m$kg), c("name", "country", "kg", "value_nok", "pest_present", "main_cn8", "main_description")], top_n)
 }
 
 # Every pest-present country: median kg/year, share of the pathway total, years with
@@ -102,9 +105,12 @@ present_origins <- function(imports, lines, stat_years, present, total_kg, count
   out$value_nok[is.na(out$value_nok)] <- 0
   out$years_with_imports[is.na(out$years_with_imports)] <- 0L
   out$share <- if (is.na(total_kg) || total_kg == 0) NA_real_ else out$kg / total_kg
-  out$main_commodity <- unname(cn8_label(main_line_by_country(imports, lines, stat_years)[out$country], lines, 70))
-  out$name <- country_label(out$country, country_names)
-  out[order(-out$kg, out$name), c("country", "name", "kg", "share", "value_nok", "years_with_imports", "main_commodity")]
+  main <- unname(main_line_by_country(imports, lines, stat_years)[out$country])
+  out$main_cn8 <- cn8_code(main)
+  out$main_description <- cn8_description(main, lines)
+  out$name <- country_name(out$country, country_names)
+  out[order(-out$kg, out$name), c("name", "country", "kg", "share", "value_nok", "years_with_imports",
+                                  "main_cn8", "main_description")]
 }
 
 # Warnings shown under a pathway's tables.
@@ -152,23 +158,27 @@ present_ui <- function(r, lines, stat_years, total_kg) {
       fmt_num(sum(po$kg)), " kg/year from ", nrow(with_imp), " of ", nrow(po), " pest-present countries (",
       fmt_pct(if (is.na(total_kg) || total_kg == 0) NA else sum(po$kg) / total_kg), " of all imports). Context, not ENT3.")),
     if (nrow(with_imp) > 0) simple_table(
-      c("Country", "kg/year", "Share of all imports", "NOK/year", "Years with imports", "Main CN8 line"),
+      c("Country", "ISO", "kg/year", "Share of all imports", "NOK/year",
+        paste0("Years with imports (of ", length(stat_years), ")"), "Main CN8 code", "Main CN8 description"),
       lapply(seq_len(nrow(with_imp)), function(i) list(
-        with_imp$name[i], fmt_num(with_imp$kg[i]), fmt_pct(with_imp$share[i]), fmt_num(with_imp$value_nok[i]),
-        paste0(with_imp$years_with_imports[i], " / ", length(stat_years)), with_imp$main_commodity[i]
-      )), right = 2:5),
+        with_imp$name[i], with_imp$country[i], fmt_num(with_imp$kg[i]), fmt_pct(with_imp$share[i]),
+        fmt_num(with_imp$value_nok[i]), with_imp$years_with_imports[i],
+        shiny::tags$code(with_imp$main_cn8[i]), with_imp$main_description[i]
+      )), right = 3:6),
     if (nrow(without) > 0) shiny::p(class = "small", shiny::tags$b("No recorded imports from: "),
-                                    paste(without$name, collapse = ", "))
+                                    paste0(without$name, " (", without$country, ")", collapse = ", "))
   )
 }
 
 origins_ui <- function(r, lines, stat_years) {
   o <- origin_summary(r$imports, lines, stat_years, r$present_countries, r$country_names)
   if (nrow(o) == 0) return(shiny::p("No imports recorded."))
-  simple_table(c("Origin", "kg/year", "NOK/year", "Pest present", "Main CN8 line"),
-    lapply(seq_len(nrow(o)), function(i) list(o$name[i], fmt_num(o$kg[i]), fmt_num(o$value_nok[i]),
-      if (o$pest_present[i]) shiny::span(class = "text-danger", "● present") else "", o$main_line[i])),
-    right = 2:3)
+  simple_table(c("Country", "ISO", "kg/year", "NOK/year", "Pest present", "Main CN8 code", "Main CN8 description"),
+    lapply(seq_len(nrow(o)), function(i) list(
+      o$name[i], o$country[i], fmt_num(o$kg[i]), fmt_num(o$value_nok[i]),
+      if (o$pest_present[i]) shiny::span(class = "text-danger", "yes") else "no",
+      shiny::tags$code(o$main_cn8[i]), o$main_description[i])),
+    right = 3:4)
 }
 
 lines_ui <- function(r, lines, stat_years, total_kg) {

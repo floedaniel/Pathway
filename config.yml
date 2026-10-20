@@ -15,8 +15,8 @@ default:
   volume_stat: median
 
   llm:
-    provider: claude        # claude | hf
-    model: null             # set in Step 9
+    provider: openai        # openai | claude | hf
+    model: gpt-5.5-2026-04-23   # pinned release, chosen 2026-10-20 from the key's model list
     hf_base_url: https://router.huggingface.co/v1
 
   language: en              # write-up language

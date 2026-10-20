@@ -2,8 +2,8 @@
 # Env vars (e.g. from ~/.Renviron) win. If one is unset, it is read from the
 # git-ignored local key folder API_kays/ (first line of the file).
 
-local_key_files <- c(EPPO_KEY = "EPPO_beta.txt", ANTHROPIC_API_KEY = "anthropic_key.txt",
-                     HF_TOKEN = "hugging_face.txt")
+local_key_files <- c(EPPO_KEY = "EPPO_beta.txt", OPENAI_API_KEY = "tore_vkm_openai.txt",
+                     ANTHROPIC_API_KEY = "anthropic_key.txt", HF_TOKEN = "hugging_face.txt")
 
 load_local_keys <- function(dir = "API_kays") {
   for (var in names(local_key_files)) {
@@ -24,6 +24,7 @@ load_settings <- function(file = "config.yml", profile = Sys.getenv("R_CONFIG_AC
 # the LLM key depends on the configured provider.
 required_secrets <- function(settings) {
   llm_key <- switch(settings$llm$provider,
+    openai = "OPENAI_API_KEY",
     claude = "ANTHROPIC_API_KEY",
     hf = "HF_TOKEN",
     stop_app("bad_config", field = "llm.provider", value = settings$llm$provider)

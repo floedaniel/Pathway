@@ -29,7 +29,10 @@ test_that("local key files fill unset env vars, but never override set ones", {
 
 test_that("check_secrets names the missing env vars for the configured provider", {
   s <- test_settings()
-  withr::local_envvar(EPPO_KEY = "", ANTHROPIC_API_KEY = "", HF_TOKEN = "x")
+  withr::local_envvar(EPPO_KEY = "", OPENAI_API_KEY = "", ANTHROPIC_API_KEY = "", HF_TOKEN = "x")
+  s$llm$provider <- "openai"
+  expect_error(check_secrets(s), "EPPO_KEY, OPENAI_API_KEY", class = "pathwise_stop_missing_secret")
+  s$llm$provider <- "claude"
   expect_error(check_secrets(s), "EPPO_KEY, ANTHROPIC_API_KEY", class = "pathwise_stop_missing_secret")
 
   s$llm$provider <- "hf"

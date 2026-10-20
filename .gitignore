@@ -36,3 +36,6 @@ data/law/raw/
 # Local key folder (never commit)
 API_kays/
 API_keys/
+
+# rsconnect deployment records (contain account/app ids)
+rsconnect/

@@ -1,6 +1,6 @@
 # Panel 2: SSB graph. 10 years, one facet per host group, stacked bars of the top N
 # origins (rest as "Other"), largest origin at the bottom of the stack. Origins:
-# all countries (pest-present ones marked "*") or pest-present countries only.
+# all countries or pest-present countries only.
 # ggplot2 + viridis.
 
 # info: the pathway's host selection (pinfo(r, pathway)).
@@ -17,7 +17,7 @@ graph_data <- function(imports, cn8_table, pathway, info, years, present, countr
     top <- utils::head(names(totals), top_n)
     label <- function(cc) {
       nm <- ifelse(is.na(country_names[cc]), cc, country_names[cc])
-      paste0(nm, ifelse(origins == "all" & cc %in% present, " *", ""))
+      nm
     }
     by_c$origin <- ifelse(by_c$country %in% top, label(by_c$country), "Other")
     out <- dplyr::summarise(dplyr::group_by(by_c, origin, year), quantity = sum(q), .groups = "drop")
@@ -40,7 +40,7 @@ graph_plot <- function(d, title, origins = "all") {
     ggplot2::facet_wrap(~group, scales = "free_y", ncol = 1) +
     ggplot2::scale_fill_viridis_d(option = "D") +
     ggplot2::labs(x = NULL, y = "million kg", title = title,
-                  fill = if (origins == "all") "Origin (* = pest present)" else "Pest-present origin") +
+                  fill = if (origins == "all") "Origin" else "Pest-present origin") +
     ggplot2::theme_minimal(base_size = 13)
 }
 

@@ -35,12 +35,14 @@ The app stops at start with a clear message if a needed key is missing. SSB, the
 Type an EPPO code or a scientific name (e.g. `AGRLAX` or `Agrilus anxius`) and press **Run**. The pathways are chosen from the pest's EPPO host-commodity list, or from its host plants when EPPO has no list. There is nothing else to choose.
 
 * **Header:** pest and code, where the pathways come from, number of conifer and non-conifer hosts, the number of countries where the pest is present (whose imports are used), years.
-* **Panel 1, SSB table:** one block per pathway. All numbers are imports from the countries where the pest is present.
-  * *All customs codes below (ENT3 answer)*: kg imported per year from those countries (median over 10 years) and its FinnPRIO class (`small`, `medium`, `large`). Conifer and non-conifer rows appear only when the pest has both kinds of host.
-  * *Where the imports come from*: one row per pest-present country with imports: kg per year, share of the ENT3 amount, NOK per year, years with imports, and the largest customs code and what it covers. Countries without recorded imports are listed below the table.
-  * *What is imported: the customs codes counted*: every customs (CN8) code that makes up the ENT3 amount. Each row gives the tariff wording, **Only the host?** ("Yes (Betula)" for a code that names the host genus, "No, also other species" for e.g. pallets of any wood), kg per year, share and the total over the 10 years. Many small flows have a median of 0, so the total shows them.
-  * Notes on the basis (EPPO list or host plants) and on where the number is an upper bound.
-  * *Where the host is named in the import statistics*: every customs code in SSB table 08801 whose name mentions a host genus (Latin or Norwegian name, e.g. *bjørk* for *Betula*). Each is marked counted, or not counted with the reason.
+* **Panel 1, SSB table:** all numbers are imports from the countries where the pest is present.
+  * **Summary** first: one row per pathway. Columns: what it is based on, kg per year (median over 10 years), ENT3 class (`small`, `medium`, `large`), largest source country, largest customs code. Pathways to assess manually (e.g. seeds) are listed as such.
+  * **One numbered card per pathway** ("1. Plants for planting", "2. Wood"), with the ENT3 answer in the card header. Every card has the same two tables, with the same number columns: kg per year (median), kg in total over the 10 years, share of total, NOK in total, years with imports.
+    * *By country*: one row per country with imports, plus its largest customs code. Countries without recorded imports are listed below.
+    * *By customs code*: the customs (CN8) codes that make up the ENT3 amount, with a short tariff name (full text on hover). **Only the host?** says "Yes (Betula)" for a code that names the host genus and "No, also other species" for e.g. pallets of any wood.
+    * Both tables end in a **Total** row. Shares are of the 10-year total, so they add up to 100 %. The total per year is the ENT3 amount: the median of the yearly totals, which is not the sum of the row medians.
+    * Notes at the bottom of the card.
+  * **Where the host is named in the import statistics** (own card): every customs code in SSB table 08801 whose name mentions a host genus (Latin or Norwegian name, e.g. *bjørk* for *Betula*). Each is marked counted, or not counted with the reason.
 * **Panel 2, SSB graph:** imports per year from the pest-present countries as stacked bars by country. It shows the top 6 countries plus "Other countries", with the largest at the bottom, and one facet per host group. Each legend entry names the country and its largest CN8 lines. You can download it as PNG.
 * **Panel 3, Lovdata:** units of FOR-2000-12-01-1333 that name the pest, then origin rules (host genus plus a pest-present country), then units naming only the host. Each has an id such as *Vedlegg 3, nr. 11*, a link and a copy button.
 * **Panel 4, FinnPRIO write-up:** one editable text per computed pathway, with Copy and Regenerate. It is labelled with the model that wrote the regulation lines.

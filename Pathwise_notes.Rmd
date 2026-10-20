@@ -63,14 +63,15 @@ Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant comm
 **Screen:**
 
 - **Header strip:** pest and code, where pathways come from (EPPO host commodities with count, or host plants with the reason), host counts (conifer / non-conifer / not plants), "SSB imports only from the N countries where the pest is present" (plus "also present in Norway" when so), years.
-- **Panel 1, SSB table:** per pathway one block, all numbers from pest-present countries only. Headings in plain words (user: "nobody will understand 'CN8 lines in this pathway'"), each with one explanatory sentence.
-  - Class table: What is counted | kg imported per year from <country names, or "the N countries where the pest is present"> (median 2016-2025) | ENT3 class. Rows "All customs codes below (ENT3 answer)", and "Of which codes for conifer / non-conifer hosts (information)" only when both groups exist.
-  - "Where the imports come from (2016-2025)": Country | ISO | kg per year (median) | Share of the ENT3 amount | NOK per year (median) | Years with imports (of N) | Largest customs code | What it covers; countries without imports listed below.
-  - "What is imported: the customs codes counted for <pathway> (2016-2025)", with an explanation (EPPO categories, host genera, upper bound, median 0): Customs code (CN8) | What the code covers (customs tariff) | Only the host? | kg per year (median) | Share of the ENT3 amount | kg in total 2016-2025. "Only the host?" = "Yes (<genus>)" when the code names a host genus, else "No, also other species" (+ ", with bark"/", debarked"). Codes without imports: "Also counted, but no recorded imports from these countries: ...".
-  - Notes on the basis (EPPO list or fallback) and upper bounds.
-  - Wood: with-bark subtotal (information).
-  - Removed with decision 52: "Top origins (all countries)", the pest-present kg/share columns.
-  - "Where the host is named in the import statistics (<genus> = <Norwegian name>)": Customs code (CN8) | Valid years | Name in SSB | Host | Matched word | Counted?.
+- **Panel 1, SSB table** (decision 54; user: "confusing and cluttered. Clear headings! Summary first, then clearly separate different pathways. Tables should be similar for comparison. And contain sums at the bottom"). All numbers from pest-present countries only.
+  - **Summary:** "Imports into Norway from <countries> (where the pest is present), 2016-2025. Imports from other countries are not used." Table, one row per pathway: Pathway | Based on | kg per year (median 2016-2025) | ENT3 class | Largest source country | Largest customs code. Manual pathways listed with "assess manually". No total across pathways (one ENT3 per pathway).
+  - **One card per computed pathway**, numbered ("1. Plants for planting", "2. Wood"); header shows ENT3 class and kg per year. Body: "Based on ..." line; conifer / non-conifer split as one sentence when both exist; then two tables with the same number columns: kg per year (median) | kg in total 2016-2025 | Share of total | NOK in total 2016-2025 | Years with imports (of 10).
+    - "By country": Country | ISO | numbers | Largest customs code. "No recorded imports from: ..." below.
+    - "By customs code" (one explanatory sentence): Customs code | What the code covers (short tariff label, full text on hover) | Only the host? | numbers. "Also counted, no recorded imports: ..." below.
+    - Total row at the bottom of both: ENT3 amount* | sum of totals | 100 % | NOK sum | years with any import. "* Total per year = the ENT3 amount: the median of the yearly totals, not the sum of the medians above." Shares are of the 10-year total, so they add up to 100 %.
+    - Notes as a small list at the bottom of the card (bark subtotal included).
+  - **Where the host is named in the import statistics** (own card): Customs code | Valid years | Name in SSB | Host | Matched word | Counted?.
+  - Code: `panel1_ui()` -> `summary_ui()`, `pathway_tables()` (numbers), `pathway_card_ui()`, `host_search_ui()` in `R/mod_table.R`.
 - **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom. Only pest-present countries. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Caption explains the bars. (The all/pest-present switch was removed with decision 52.) PNG download. No "*" marker (removed on request).
 - **Panel 3, Lovdata:** snippets with id (e.g. "Vedlegg 2, nr. 10"), link, copy button.
 - **Panel 4, FinnPRIO write-up:** per computed pathway an editable text box, Copy, Regenerate, labelled with its source (model or fallback).
@@ -190,7 +191,7 @@ Note: <pathway notes>
 
 - `README.md`: user guide (quick start, keys, panels, method, caveats, sources, deployment).
 - `docs/vignette.md`: worked example, AGRLAX step by step, real numbers from a run on 2026-10-20. Markdown, not R Markdown, because rmarkdown is not in the project library. Re-run and update the numbers if the method changes.
-- `docs/decisions.md`: decisions 1-52 (49 front page and graph, 50 deployment, 51 documentation, 52 pest-present countries only).
+- `docs/decisions.md`: decisions 1-54 (49 front page and graph, 50 deployment, 51 documentation, 52 pest-present countries only, 53 plain-language Panel 1, 54 Panel 1 layout).
 - `docs/findings.md`.
 - Reference copies: `docs/reference/eppo_gd_general_user-guide.pdf`, `docs/reference/tolltariffstruktur.json`.
 
@@ -262,6 +263,7 @@ Note: <pathway notes>
 10. Notes rewritten as project memory; README, vignette (`docs/vignette.md`), decisions 49-51 and findings updated. `old_scripts/` deleted.
 11. Decision 52: imports only from countries where the pest is present (Norway excluded); Panel 1, graph and write-up reworked; docs updated.
 12. Decision 53: plain-language headings and columns in Panel 1; "Only the host?" column replaces the flags column; genus-specific codes no longer called "mixed line".
+13. Decision 54: Panel 1 restructured: summary first, one card per pathway, identical tables with total rows.
 
 Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; effectively replaced by Connect Cloud). See Open questions 2 and 3.
 

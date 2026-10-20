@@ -55,3 +55,13 @@ test_that("spruce lines are fir AND spruce in the tariff (Abies, Picea); residua
   expect_false("44032501_2017" %in% w$cn8)                          # other conifers excl. pine, fir, spruce
   expect_false("44032111_2017" %in% w$cn8)                          # pine
 })
+
+test_that("ssb_imports works even when a global variable named c exists (do.call(c, ...) bug)", {
+  s <- test_settings()
+  assign("c", "AGRLAX", envir = globalenv())
+  on.exit(rm("c", envir = globalenv()), add = TRUE)
+  meta <- list(cn8 = tibble::tibble(cn8 = "A_2017", label = "", q1_unit = "kg"))
+  fake <- function(cn8, years) tibble::tibble(cn8 = cn8, country = "DE", year = 2025L, kg = 1, value_nok = 1)
+  x <- ssb_imports(data.frame(cn8 = "A_2017", commodity_group = "conifer"), 2016:2025, s, meta = meta, fetch_chunk = fake)
+  expect_s3_class(attr(x, "fetched_at"), "POSIXct")
+})

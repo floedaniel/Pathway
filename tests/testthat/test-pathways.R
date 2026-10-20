@@ -37,9 +37,14 @@ test_that("manual pathways only: no SSB call, no classes, empty draft", {
   local_eppo_mock()  # SSB requests would hit the mock and fail with 400
   s <- test_settings()
   withr::local_dir(root)  # pipeline reads data/ relative to the project root
+  # SSB metadata (labels, for the host search) from the cache; any SSB data call would fail
+  cache_set("ssb", "metadata_no_en", list(cn8 = tibble::tibble(cn8 = "44032111_2017",
+            label = "Massevirke av furu (2017-) (M1=kg,  M2=m³)", q1_unit = "kg"),
+            years = 2016:2025, countries = c(US = "USA"), countries_en = c(US = "USA"), updated = "x"), s)
   r <- run_assessment("IPSXCA", s, pathways = "seeds", cn8_table = cn8_table, law_index_fn = law_fixture_idx,
                       commodities_fn = function(code, settings) parse_host_commodities(""))
   expect_null(r$imports)
   expect_null(r$classes)
+  expect_equal(r$host_search$code, "44032111")  # host search still runs (Pinus = furu)
   expect_equal(generate_writeup(r, "seeds", s)$text, "")
 })

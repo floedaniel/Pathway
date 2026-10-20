@@ -294,6 +294,22 @@ pathway_block_ui <- function(p, r, cn8_table, settings) {
   )
 }
 
+# All SSB 08801 lines whose label names a host genus (R/host_search.R).
+host_search_ui <- function(r) {
+  h <- r$host_search
+  if (is.null(h)) return(NULL)
+  shiny::tagList(
+    shiny::h5(class = "mt-4", "Host search in SSB table 08801"),
+    shiny::p(class = "small text-muted", paste0(
+      "Every 08801 line (valid in the table window) whose label names a host genus, by Latin or Norwegian name (",
+      paste(unique(paste0(h$host, " = ", h$term)), collapse = ", "),
+      "). Only lines marked 'counted' are part of the ENT3 numbers above.")),
+    if (nrow(h) == 0) shiny::p("No 08801 label names the host genera.") else simple_table(
+      c("CN8 code", "Valid", "SSB label", "Host", "Matched term", "Status"),
+      lapply(seq_len(nrow(h)), function(i) list(shiny::tags$code(h$code[i]), h$valid[i], h$label[i], h$host[i], h$term[i],
+        if (startsWith(h$status[i], "counted")) shiny::span(class = "text-success", h$status[i]) else h$status[i]))))
+}
+
 mod_table_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
@@ -310,7 +326,7 @@ mod_table_server <- function(id, result, pathways, cn8_table, settings) {
       shiny::req(is.list(r), !inherits(r, "condition"))
       sel <- pathways()
       shiny::validate(shiny::need(length(sel) > 0, "Select at least one pathway."))
-      shiny::tagList(lapply(sel, pathway_block_ui, r = r, cn8_table = cn8_table, settings = settings))
+      shiny::tagList(lapply(sel, pathway_block_ui, r = r, cn8_table = cn8_table, settings = settings), host_search_ui(r))
     })
     output$csv <- shiny::downloadHandler(
       filename = function() paste0("pathwise_", result()$code, ".csv"),

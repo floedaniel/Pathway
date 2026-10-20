@@ -217,4 +217,4 @@ Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
 1. **OpenAI model.** Write-ups use `gpt-5.5-2026-04-23` (pinned dated release; the key also offers newer gpt-6 variants). Keep it, or pick another in `config.yml` (`llm.model`)?
 2. **Step 11 (model comparison).** The plan compared Claude and 2-3 Hugging Face models. With OpenAI chosen, still wanted, or skip?
 3. **Step 12 (deploy on the second laptop with a Cloudflare tunnel).** Go ahead when you are ready, or later?
-
+5. **Host search hits outside the scope.** Searching 08801 for the host (e.g. bjørk) also finds birch veneer sheets (4408) and plywood with a birch face (4412); for conifers also profiled wood (4409) and plywood. They are listed in Panel 1 as 'not counted' (outside Vedlegg 5A nr. 8). Should any of them count, e.g. for EPPO's 'manufactured articles'?

@@ -82,7 +82,7 @@ ssb_imports <- function(lines, years, settings, meta = ssb_metadata(settings),
     cached("ssb", list("08801", "kg+nok", ch, years), function() fetch_chunk(ch, years), settings)
   })
   out <- dplyr::bind_rows(lapply(entries, `[[`, "value"))
-  structure(out, fetched_at = min(do.call(c, lapply(entries, `[[`, "fetched_at"))))
+  structure(out, fetched_at = min(do.call(base::c, lapply(entries, `[[`, "fetched_at"))))
 }
 
 read_commodity_cn8 <- function(file = "data/commodity_cn8.csv") {

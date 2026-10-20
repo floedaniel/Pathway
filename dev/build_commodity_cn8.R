@@ -183,6 +183,28 @@ out$tariff_label <- mapply(make_label, segs, depth)
 cat("distinct tariff labels:", length(unique(out$tariff_label[nzchar(out$tariff_label)])), "of",
     sum(nzchar(out$tariff_label)), "\n")
 
+# ---- Norwegian genus names (for searching SSB labels for host plants) ---------
+# Pairs from the tariff wording, e.g. "bjørk (Betula spp.)", "poppel og osp
+# (Populus spp.)", "rose (Rosa)". SSB labels also use the short form without
+# "-tre" (kirsebærtre -> kirsebær), so that form is added.
+txt <- character()
+walk_txt <- function(node) {
+  txt <<- c(txt, node$beskrivelse %||% "", node$vareslag %||% "")
+  for (k in c("avsnitt", "kapitler", "inndelinger", "oppdelinger", "posisjoner")) for (ch in node[[k]] %||% list()) walk_txt(ch)
+}
+for (a in tariff$avsnitt) walk_txt(a)
+txt <- unique(txt[nzchar(txt)])
+pairs <- unlist(regmatches(txt, gregexpr("(\\p{Ll}[\\p{Ll}-]+( og \\p{Ll}[\\p{Ll}-]+)?) \\(([A-Z][a-z]+)( spp\\.)?\\)", txt, perl = TRUE)))
+gn <- do.call(rbind, lapply(pairs, function(p) {
+  genus <- sub(".*\\(([A-Z][a-z]+).*", "\\1", p)
+  words <- strsplit(sub(" \\(.*", "", p), " og ", fixed = TRUE)[[1]]
+  data.frame(genus = genus, norwegian = unique(c(words, sub("tre$", "", words[grepl(".{4,}tre$", words)]))))
+}))
+gn <- unique(gn[order(gn$genus, gn$norwegian), ])
+gn$source <- "tolltariffstruktur"
+write.csv(gn, "data/genus_names_no.csv", row.names = FALSE, fileEncoding = "UTF-8")
+cat("Norwegian genus names:", nrow(gn), "for", length(unique(gn$genus)), "genera\n")
+
 out <- out[, c("pathway", "cn8", "description", "tariff_description", "tariff_label", "commodity_group", "eppo_category", "genus",
                "excludes_genera", "flags", "source", "valid_from", "valid_to", "notes", "reviewed")]
 write.csv(out, "data/commodity_cn8.csv", row.names = FALSE, na = "", fileEncoding = "UTF-8")

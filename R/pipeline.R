@@ -94,6 +94,16 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
     }))
   }
 
+  # Host search: every 08801 line whose label names a host genus (Latin or
+  # Norwegian), with whether it is counted. Genera from the EPPO host-commodity
+  # list when used, else from the host plants.
+  if (is.null(meta)) meta <- ssb_metadata(settings)
+  search_genera <- if (source == "eppo_commodities") unlist(lapply(pc$info, function(i) i$hosts$genus)) else classified$genus
+  counted <- lapply(pc$info, function(i) NULL)
+  for (p in computed) counted[[p]] <- pathway_lines(cn8_table, p, pc$info[[p]])$cn8
+  host_hits <- host_search(meta$cn8, search_genera, read_genus_names_no(), counted,
+                           first_year = min(years %||% ssb_window(settings, meta)))
+
   pest_tax <- eppo_taxonomy(code, settings)                          # 8
   names <- eppo_names(code, settings)
   country_names <- if (is.null(meta)) character() else meta$countries_en   # English, for UI and write-up
@@ -114,7 +124,7 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
     pathways = c(computed, pc$manual), pathway_info = pc$info, pathway_source = source,
     commodities = pc$table, other_categories = pc$other,
     hosts = classified, present_countries = present, country_names = country_names,
-    years = years, imports = imports, classes = classes, law = law,
+    years = years, imports = imports, classes = classes, law = law, host_search = host_hits,
     fetched = list(
       eppo = attr(present, "fetched_at"),
       ssb = if (is.null(imports)) NULL else attr(imports, "fetched_at"),

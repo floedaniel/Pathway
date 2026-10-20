@@ -20,14 +20,16 @@ ssb_get <- function(path, query = list()) {
 
 # Table metadata: CN8 labels (with M1/M2 units) and available years. Cached (ssb).
 ssb_metadata <- function(settings) {
-  entry <- cached("ssb", "metadata", function() {
+  entry <- cached("ssb", "metadata_no_en", function() {
     m <- jsonlite::fromJSON(ssb_get("metadata", list(lang = "no")), simplifyVector = FALSE)
+    m_en <- jsonlite::fromJSON(ssb_get("metadata", list(lang = "en")), simplifyVector = FALSE)
     labels <- unlist(m$dimension$Varekoder$category$label)
     list(
       cn8 = tibble::tibble(cn8 = names(labels), label = unname(labels),
                            q1_unit = sub(".*M1=([^,]*),.*", "\\1", labels)),
       years = sort(as.integer(unlist(m$dimension$Tid$category$label))),
-      countries = unlist(m$dimension$Land$category$label),
+      countries = unlist(m$dimension$Land$category$label),          # Norwegian (Lovdata search)
+      countries_en = unlist(m_en$dimension$Land$category$label),    # English (UI, write-up)
       updated = m$updated
     )
   }, settings)
@@ -90,9 +92,38 @@ read_commodity_cn8 <- function(file = "data/commodity_cn8.csv") {
 # CN8 lines for a pathway and a set of groups ("both" lines belong to every group).
 # "monocot" lines (0601 bulbs, tubers) join non_conifer only when monocot = TRUE,
 # i.e. at least one host is a monocot.
-cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE) {
+# host_genera: named list per group (conifer, non_conifer) of host genera, or NULL
+# for no genus filter (also used for a group with a host known only above genus).
+# A genus-specific line (column `genus`, e.g. birch round wood) counts only when a
+# host of its group is in that genus; a residual line (`excludes_genera`, e.g.
+# "other broadleaved") counts only when a host genus of its group is outside the list.
+cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera = NULL) {
   g <- cn8_table$commodity_group
   keep <- g %in% groups | (g == "both" & length(groups) > 0) |
     (g == "monocot" & monocot & "non_conifer" %in% groups)
-  cn8_table[cn8_table$pathway == pathway & keep, ]
+  x <- cn8_table[cn8_table$pathway == pathway & keep, ]
+  if (is.null(host_genera) || nrow(x) == 0) return(x)
+  split_genera <- function(s) if (is.na(s) || !nzchar(s)) character() else strsplit(s, ";")[[1]]
+  ok <- vapply(seq_len(nrow(x)), function(i) {
+    grp <- if (x$commodity_group[i] %in% c("conifer", "non_conifer")) x$commodity_group[i] else NA
+    if (is.na(grp) || !grp %in% names(host_genera) || is.null(host_genera[[grp]])) return(TRUE)
+    hg <- host_genera[[grp]]
+    only <- split_genera(x$genus[i])
+    excl <- split_genera(x$excludes_genera[i])
+    if (length(only) > 0) return(any(hg %in% only))
+    if (length(excl) > 0) return(any(!hg %in% excl))
+    TRUE
+  }, logical(1))
+  x[ok, ]
+}
+
+# Host genera per group for cn8_lines(); NULL for a group where some host has no
+# genus in its lineage (e.g. a family-level host), so that group is not filtered.
+host_genera_by_group <- function(classified) {
+  out <- lapply(c(conifer = "conifer", non_conifer = "non_conifer"), function(g) {
+    gen <- classified$genus[classified$host_class == g]
+    if (length(gen) == 0) return(character())
+    if (anyNA(gen)) NULL else unique(gen)
+  })
+  out[!vapply(out, function(x) !is.null(x) && length(x) == 0, logical(1))]
 }

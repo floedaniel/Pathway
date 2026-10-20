@@ -13,6 +13,7 @@ run_assessment <- function(code, settings, pathways = computed_pathways,
   classified <- classify_hosts(hosts, settings)                      # 3
   groups <- run_groups(classified)                                   # 4
   monocot <- any(classified$monocot)
+  host_genera <- host_genera_by_group(classified)
   present <- eppo_present_countries(code, settings)                  # 5
 
   computed <- intersect(pathways, computed_pathways)                 # 6-7
@@ -23,27 +24,28 @@ run_assessment <- function(code, settings, pathways = computed_pathways,
   if (length(computed) > 0) {
     meta <- ssb_metadata(settings)
     years <- ssb_window(settings, meta)
-    lines <- dplyr::bind_rows(lapply(computed, function(p) cn8_lines(cn8_table, p, groups, monocot)))
+    lines <- dplyr::bind_rows(lapply(computed, function(p) cn8_lines(cn8_table, p, groups, monocot, host_genera)))
     imports <- ssb_imports(lines, years, settings, meta)
     classes <- dplyr::bind_rows(lapply(computed, function(p) {
-      classify_pathway(imports, cn8_table, p, groups, present, settings, years, thresholds, monocot)
+      classify_pathway(imports, cn8_table, p, groups, present, settings, years, thresholds, monocot, host_genera)
     }))
   }
 
   pest_tax <- eppo_taxonomy(code, settings)                          # 8
   names <- eppo_names(code, settings)
-  country_names <- if (is.null(meta)) character() else meta$countries
+  country_names <- if (is.null(meta)) character() else meta$countries_en   # English, for UI and write-up
+  country_names_no <- if (is.null(meta)) character() else meta$countries  # Norwegian, for Lovdata
   terms <- law_search_terms(
     pest_names = names$fullname[names$lang_iso == "la"],
     pest_lineage = pest_tax$prefname[pest_tax$type %in% c("Genus", "Subfamily", "Family")],
     host_genera = unique(stats::na.omit(classified$genus)),
     groups = groups,
-    countries = unname(country_names[present])
+    countries = unname(country_names_no[present])
   )
   law <- law_search(law_index_fn(settings), terms)
 
   list(
-    code = code, pest = overview$prefname, groups = groups, monocot = monocot,
+    code = code, pest = overview$prefname, groups = groups, monocot = monocot, host_genera = host_genera,
     pathways = pathways, hosts = classified, present_countries = present,
     country_names = country_names,
     years = years, imports = imports, classes = classes, law = law,

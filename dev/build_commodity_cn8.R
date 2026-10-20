@@ -91,8 +91,38 @@ wood$source <- paste("vedlegg 5A nr. 8:", entry[wood_sel])
 out <- rbind(plants, wood)
 out$notes <- ""
 out$reviewed <- ""
-out <- out[, c("pathway", "cn8", "description", "commodity_group", "flags", "source",
-               "valid_from", "valid_to", "notes", "reviewed")]
+
+# ---- genus-specific and residual lines (from the SSB wording) ----------------
+# `genus`: the line covers only these genera; it counts only when a host belongs
+# to one of them. `excludes_genera`: residual line ("other ..." / "unnt ...");
+# it counts only when a host genus is outside the list. Others count for any host.
+genus_rules <- list(
+  "^4403(21|22)|^44032005" = "Pinus", "^4403(23|24)" = "Picea",
+  "^44071003|^44071008|^440711" = "Pinus", "^440712" = "Picea",
+  "^440713" = "Picea;Pinus;Abies", "^440714" = "Tsuga;Abies",
+  "^440391" = "Quercus", "^4403(92|93|94)" = "Fagus", "^4403(95|96)|^4403990[12]_1992" = "Betula",
+  "^440397" = "Populus",
+  "^440791" = "Quercus", "^440792" = "Fagus", "^440793" = "Acer", "^440794" = "Prunus",
+  "^440795" = "Fraxinus", "^440796" = "Betula", "^440797" = "Populus",
+  "^44160010" = "Quercus",
+  "^060230" = "Rhododendron", "^060240" = "Rosa"
+)
+residual_rules <- list(
+  "^4403(25|26)" = "Pinus;Picea", "^44032006" = "Pinus",
+  "^4407100[49]" = "Pinus", "^44071900" = "Pinus;Picea",
+  "^44039900_2017" = "Quercus;Fagus;Betula;Populus;Eucalyptus", "^44039908_2002" = "Quercus;Fagus",
+  "^44079900_2007" = "Quercus;Fagus", "^44079900_2017" = "Quercus;Fagus;Acer;Prunus;Fraxinus;Betula;Populus"
+)
+apply_rules <- function(rules) {
+  v <- rep("", nrow(out))
+  for (p in names(rules)) v[grepl(p, out$cn8) & v == ""] <- rules[[p]]
+  v
+}
+out$genus <- apply_rules(genus_rules)
+out$excludes_genera <- apply_rules(residual_rules)
+
+out <- out[, c("pathway", "cn8", "description", "commodity_group", "genus", "excludes_genera",
+               "flags", "source", "valid_from", "valid_to", "notes", "reviewed")]
 write.csv(out, "data/commodity_cn8.csv", row.names = FALSE, na = "", fileEncoding = "UTF-8")
 print(table(out$pathway, out$commodity_group))
 excluded <- d[!is.na(entry) & !wood_sel, c("cn8", "description")]

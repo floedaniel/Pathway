@@ -65,9 +65,9 @@ classify_volume <- function(imports, lines, group, stat = "median", years, volum
 # lines (each CN8 line once): the pathway's ENT3 answer (role "ent3"). Per-group
 # rows (conifer, non_conifer) are information (role "info").
 classify_pathway <- function(imports, cn8_table, pathway, groups, present_countries, settings,
-                             years, thresholds = read_thresholds(), monocot = FALSE) {
+                             years, thresholds = read_thresholds(), monocot = FALSE, host_genera = NULL) {
   rows <- lapply(c("all_hosts", groups), function(g) {
-    lines <- cn8_lines(cn8_table, pathway, if (g == "all_hosts") groups else g, monocot)
+    lines <- cn8_lines(cn8_table, pathway, if (g == "all_hosts") groups else g, monocot, host_genera)
     classify_volume(imports, lines, g, settings$volume_stat, years, settings$volume_n,
                     present_countries, thresholds)
   })

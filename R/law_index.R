@@ -84,43 +84,52 @@ law_index <- function(settings, download = law_download) {
 }
 
 # Search terms (Flow step 8). pest_names: EPPO scientific names (preferred and
-# synonyms); pest_lineage / groups add higher taxa and their aliases from
-# data/law_taxon_aliases.csv; host_genera and countries (Norwegian names) as given.
+# synonyms), matched as written. pest_taxa: the pest's higher taxa (genus,
+# subfamily, family) and their aliases from data/law_taxon_aliases.csv, matched
+# only as "<taxon> spp." (e.g. "Scolytidae spp."), so a genus name inside another
+# species ("Agrilus planipennis") is not a hit. host_genera and countries
+# (Norwegian names) as given; conifer aliases (Coniferales, bartrær) are host terms.
 law_search_terms <- function(pest_names, pest_lineage = character(), host_genera = character(),
                              groups = character(), countries = character(),
                              aliases = utils::read.csv("data/law_taxon_aliases.csv", colClasses = "character",
                                                        encoding = "UTF-8")) {
-  pest_taxa <- c(pest_lineage, if ("conifer" %in% groups) "Pinopsida")
   alias_of <- function(taxa) aliases$alias[aliases$taxon %in% taxa]
   list(
-    pest = unique(c(pest_names, pest_lineage, alias_of(pest_lineage))),
+    pest = unique(pest_names),
+    pest_taxa = unique(c(pest_lineage, alias_of(pest_lineage))),
     host = unique(c(host_genera, alias_of(if ("conifer" %in% groups) "Pinopsida"))),
     country = unique(countries)
   )
 }
 
-term_hits <- function(text, terms) {
+term_hits <- function(text, terms, suffix = "") {
   if (length(terms) == 0) return(rep(list(character()), length(text)))
-  pats <- paste0("(?<!\\p{L})", gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", terms), "(?!\\p{L})")
+  pats <- paste0("(?<!\\p{L})", gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", terms), suffix, "(?!\\p{L})")
   hit <- vapply(pats, function(p) grepl(p, text, ignore.case = TRUE, perl = TRUE), logical(length(text)))
   hit <- matrix(hit, nrow = length(text))
   lapply(seq_along(text), function(i) terms[hit[i, ]])
 }
 
-# Units matching a pest term or a host term. Country terms only raise the score.
-# Score: 3 per pest term, 2 per host term, 1 per country term. Units naming the
-# pest always come first, so many host genera cannot push them down.
+# Units matching the pest, or a host genus. Tiers, in this order:
+# - pest_match: names the pest (or "<higher taxon> spp.");
+# - origin_rule: names a host genus and a country where the pest is present
+#   (origin-specific bans and requirements, e.g. vedlegg 3);
+# - host only.
+# Within a tier, score = 3 per pest term + 2 per host term + 1 per country term.
 law_search <- function(index, terms) {
   p <- term_hits(index$text, terms$pest)
+  pt <- term_hits(index$text, terms$pest_taxa, suffix = "\\s+spp")
+  p <- mapply(c, p, pt, SIMPLIFY = FALSE)
   h <- term_hits(index$text, terms$host)
   c <- term_hits(index$text, terms$country)
   n <- function(x) lengths(x)
   out <- index
   out$matched <- mapply(function(a, b, d) paste(c(a, b, d), collapse = ", "), p, h, c)
   out$pest_match <- n(p) > 0
+  out$origin_rule <- !out$pest_match & n(h) > 0 & n(c) > 0
   out$score <- 3 * n(p) + 2 * n(h) + n(c)
   out <- out[n(p) > 0 | n(h) > 0, ]
-  out <- out[order(!out$pest_match, -out$score, out$id), ]
+  out <- out[order(!out$pest_match, !out$origin_rule, -out$score, out$id), ]
   attr(out, "fetched_at") <- attr(index, "fetched_at")
   out
 }

@@ -1,14 +1,18 @@
 # Write-up checks (Step 9), with a fake LLM: no network.
 
-fake_result <- function(law_ids = c("Vedlegg 2, nr. 10", "§ 23"), pest_match = c(TRUE, FALSE)) {
+fake_result <- function(law_ids = c("Vedlegg 2, nr. 10", "§ 23"), pest_match = c(TRUE, FALSE),
+                        origin_rule = c(FALSE, FALSE)) {
   list(
     code = "IPSXCA", pest = "Ips calligraphus", groups = "conifer", present_countries = c("US", "MX"),
     classes = tibble::tibble(pathway = "wood", group = c("all_hosts", "conifer"), role = c("ent3", "info"),
                              stat = "median", years = "2016-2025", kg = 1.26e9, class = "large",
                              kg_pest_present = 4.3e5, share_pest_present = 3e-4),
-    law = tibble::tibble(id = law_ids, text = "x", pest_match = pest_match)
+    law = tibble::tibble(id = law_ids, text = "x", pest_match = pest_match, origin_rule = origin_rule)
   )
 }
+fake_present <- tibble::tibble(country = c("US", "MX"), name = c("USA (US)", "Mexico (MX)"), kg = c(4.3e5, 0),
+                               share = c(3e-4, 0), value_nok = 0, years_with_imports = c(10L, 0L),
+                               main_commodity = c("Trelast av furu", NA))
 
 fixed_ask <- function(...) {
   replies <- list(...)
@@ -16,31 +20,38 @@ fixed_ask <- function(...) {
   function(settings, system, prompt) { i <<- i + 1; replies[[min(i, length(replies))]] }
 }
 
-test_that("prompt contains labelled blocks and the deterministic numbers", {
-  p <- writeup_prompt(fake_result(), "wood")
-  expect_true(all(c("EPPO\n", "SSB (pathway: Wood)", "LAW\n") %in% sapply(c("EPPO\n", "SSB (pathway: Wood)", "LAW\n"), function(k) if (grepl(k, p, fixed = TRUE)) k else "")))
+ok_text <- paste("ENT3: large. Wood imports of all host commodities were 1 260 000 000 kg per year (median 2016-2025),",
+                 "of which 430 000 kg per year from the USA, a small share. Regulated: Vedlegg 2, nr. 10.")
+
+test_that("prompt contains labelled blocks, the numbers and pest-present countries", {
+  p <- writeup_prompt(fake_result(), "wood", fake_present)
+  for (k in c("EPPO\n", "SSB (pathway: Wood)", "PRESENT", "LAW (units naming the pest)", "ORIGIN RULES")) {
+    expect_match(p, k, fixed = TRUE)
+  }
   expect_match(p, "ENT3 class: large", fixed = TRUE)
   expect_match(p, "1 260 000 000 kg per year (median 2016-2025)", fixed = TRUE)
+  expect_match(p, "USA (US): 430 000 kg per year", fixed = TRUE)
+  expect_match(p, "No recorded imports from: Mexico (MX)", fixed = TRUE)
   expect_match(p, "Vedlegg 2, nr. 10:", fixed = TRUE)
 })
 
-test_that("LAW block says NOT FOUND when no unit names the pest", {
-  p <- writeup_prompt(fake_result(pest_match = c(FALSE, FALSE)), "wood")
+test_that("LAW block says NOT FOUND when no unit names the pest; origin rules are listed", {
+  r <- fake_result(law_ids = c("Vedlegg 3, nr. 11", "§ 23"), pest_match = c(FALSE, FALSE), origin_rule = c(TRUE, FALSE))
+  p <- writeup_prompt(r, "wood", fake_present)
   expect_match(p, "NOT FOUND", fixed = TRUE)
+  expect_match(p, "ORIGIN RULES (units naming a host genus and a pest-present country)\nVedlegg 3, nr. 11:", fixed = TRUE)
 })
 
 test_that("a valid reply is accepted and labelled with the model", {
   s <- test_settings()
-  ok <- "ENT3: large. Wood imports of all host commodities were 1 260 000 000 kg per year (median 2016-2025). Regulated: Vedlegg 2, nr. 10."
-  w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask(ok))
-  expect_equal(w$text, ok)
+  w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask(ok_text), present = fake_present)
+  expect_equal(w$text, ok_text)
   expect_equal(w$source, paste0(s$llm$provider, ":", s$llm$model))
 })
 
 test_that("write-up contains no markdown characters", {
-  s <- test_settings()
   bad <- "**ENT3: large.** 1 260 000 000 kg (median 2016-2025)."
-  expect_true("contains markdown characters" %in% validate_writeup(bad, fake_result(), "wood", s))
+  expect_true("contains markdown characters" %in% validate_writeup(bad, fake_result(), "wood", test_settings()))
 })
 
 test_that("every cited paragraph id exists in Panel 3", {
@@ -51,29 +62,30 @@ test_that("every cited paragraph id exists in Panel 3", {
   expect_length(validate_writeup(ok, fake_result(), "wood", s), 0)
 })
 
-test_that("ENT3 class in the write-up equals Panel 1 Class A", {
+test_that("ENT3 class in the write-up equals Panel 1 Class A; 'a small share' elsewhere is fine", {
   s <- test_settings()
-  expect_true(any(grepl("does not state", validate_writeup("ENT3: medium. 5 kg.", fake_result(), "wood", s))))
-  expect_true(any(grepl("different ENT3 class", validate_writeup("ENT3: large, not small.", fake_result(), "wood", s))))
+  expect_true(any(grepl("does not state", validate_writeup("Imports are 5 kg.", fake_result(), "wood", s))))
+  expect_true(any(grepl("different ENT3 class", validate_writeup("ENT3 is medium. 5 kg.", fake_result(), "wood", s))))
+  expect_length(validate_writeup(ok_text, fake_result(), "wood", s), 0)
 })
 
 test_that("a rejected reply is retried once, then the deterministic draft is used", {
   s <- test_settings()
-  w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask("# bad", "# still bad"))
+  w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask("# bad", "# still bad"), present = fake_present)
   expect_equal(w$source, "draft")
   expect_equal(w$text, writeup_draft(fake_result(), "wood", s))
-  w2 <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask("# bad", "ENT3: large. 1 260 000 000 kg/yr (median 2016-2025)."), nonce = 1)
+  w2 <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask("# bad", ok_text), nonce = 1, present = fake_present)
   expect_false(w2$source == "draft")
 })
 
 test_that("replies are cached per prompt and model; Regenerate (nonce) bypasses", {
   s <- test_settings()
   n <- 0
-  ask <- function(...) { n <<- n + 1; "ENT3: large. 1 260 000 000 kg/yr (median 2016-2025)." }
-  generate_writeup(fake_result(), "wood", s, ask = ask)
-  generate_writeup(fake_result(), "wood", s, ask = ask)
+  ask <- function(...) { n <<- n + 1; ok_text }
+  generate_writeup(fake_result(), "wood", s, ask = ask, present = fake_present)
+  generate_writeup(fake_result(), "wood", s, ask = ask, present = fake_present)
   expect_equal(n, 1)
-  generate_writeup(fake_result(), "wood", s, ask = ask, nonce = 2)
+  generate_writeup(fake_result(), "wood", s, ask = ask, nonce = 2, present = fake_present)
   expect_equal(n, 2)
 })
 

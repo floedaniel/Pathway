@@ -1,11 +1,13 @@
-# Panel 1: SSB table summary, one block per selected pathway. Tidy table, one
-# value per column: median annual kg over all origins and its ENT3 class for all
-# host commodities of the pathway (row "all_hosts", the ENT3 answer), plus kg from
-# pest-present origins and its share (context only, no class). Per-group rows
-# (conifer, non_conifer) are information.
+# Panel 1: SSB table summary, one block per selected pathway. Tidy tables, one
+# value per column, median over the statistic years, kg.
+# 1. ENT3: median annual kg over all origins and its class, for all host
+#    commodities of the pathway (row "all_hosts"); group rows are information.
+# 2. Imports from countries where the pest is present (key context, not ENT3):
+#    every pest-present country, with or without recorded imports.
+# 3. Top origins overall.
 
 fmt_num <- function(x) ifelse(is.na(x), "-", format(round(x), big.mark = " ", scientific = FALSE, trim = TRUE))
-fmt_pct <- function(x) ifelse(is.na(x), "-", paste0(round(100 * x), " %"))
+fmt_pct <- function(x) ifelse(is.na(x), "-", ifelse(x > 0 & x < 0.01, "<1 %", paste0(round(100 * x), " %")))
 
 group_label <- c(all_hosts = "All host commodities (ENT3)", conifer = "Conifer (info)",
                  non_conifer = "Non-conifer (info)")
@@ -15,30 +17,52 @@ class_badge <- function(label, official = TRUE) {
   shiny::span(class = paste0("badge text-bg-", colour, if (!official) " opacity-75"), label)
 }
 
-# Median annual quantity and value per origin over the statistic years.
-origin_summary <- function(imports, lines, stat_years, present, unit = "kg", country_names = character(),
-                           top_n = 10) {
+country_label <- function(code, country_names) {
+  nm <- unname(country_names[code])
+  ifelse(is.na(nm), code, paste0(nm, " (", code, ")"))
+}
+
+# Per-country median annual kg and NOK over the statistic years (zero years included).
+country_medians <- function(imports, lines, stat_years) {
   x <- imports[imports$cn8 %in% lines$cn8 & imports$year %in% stat_years, ]
-  if (nrow(x) == 0) return(tibble::tibble())
+  if (nrow(x) == 0) return(tibble::tibble(country = character(), kg = numeric(), value_nok = numeric(),
+                                          years_with_imports = integer()))
   per_year <- dplyr::summarise(dplyr::group_by(x, country, year),
-                               q = sum(.data[[unit]], na.rm = TRUE), v = sum(value_nok), .groups = "drop")
+                               q = sum(kg, na.rm = TRUE), v = sum(value_nok), .groups = "drop")
   full <- tidyr::complete(per_year, country, year = stat_years, fill = list(q = 0, v = 0))
-  out <- dplyr::summarise(dplyr::group_by(full, country),
-                          quantity = stats::median(q), value_nok = stats::median(v), .groups = "drop")
-  out$name <- unname(country_names[out$country])
-  out$pest_present <- out$country %in% present
-  out <- out[out$quantity > 0 | out$value_nok > 0, ]
-  utils::head(out[order(-out$quantity), c("country", "name", "quantity", "value_nok", "pest_present")], top_n)
+  dplyr::summarise(dplyr::group_by(full, country), kg = stats::median(q), value_nok = stats::median(v),
+                   years_with_imports = sum(q > 0), .groups = "drop")
 }
 
-# Information only: median annual kg on round-wood lines that are not debarked.
-bark_subtotal <- function(imports, lines, stat_years) {
-  wb <- lines[grepl("with_bark", lines$flags), ]
-  if (nrow(wb) == 0) return(NA_real_)
-  stats::median(annual_totals(imports, wb, stat_years)$quantity)
+# Top origins overall.
+origin_summary <- function(imports, lines, stat_years, present, country_names = character(), top_n = 10) {
+  m <- country_medians(imports, lines, stat_years)
+  m <- m[m$kg > 0 | m$value_nok > 0, ]
+  m$name <- country_label(m$country, country_names)
+  m$pest_present <- m$country %in% present
+  utils::head(m[order(-m$kg), c("country", "name", "kg", "value_nok", "pest_present")], top_n)
 }
 
-# Warnings shown under a computed pathway's class table.
+# Every pest-present country: median kg/year, share of the pathway total, years with
+# imports, and the largest commodity line. Countries without imports get kg = 0.
+present_origins <- function(imports, lines, stat_years, present, total_kg, country_names = character()) {
+  m <- country_medians(imports, lines, stat_years)
+  out <- tibble::tibble(country = present)
+  out <- dplyr::left_join(out, m, by = "country")
+  out$kg[is.na(out$kg)] <- 0
+  out$value_nok[is.na(out$value_nok)] <- 0
+  out$years_with_imports[is.na(out$years_with_imports)] <- 0L
+  out$share <- if (is.na(total_kg) || total_kg == 0) NA_real_ else out$kg / total_kg
+  x <- imports[imports$cn8 %in% lines$cn8 & imports$year %in% stat_years & imports$country %in% present, ]
+  top <- dplyr::summarise(dplyr::group_by(x, country, cn8), q = sum(kg, na.rm = TRUE), .groups = "drop")
+  top <- top[order(top$country, -top$q), ]
+  top <- top[!duplicated(top$country), ]
+  out$main_commodity <- lines$description[match(top$cn8[match(out$country, top$country)], lines$cn8)]
+  out$name <- country_label(out$country, country_names)
+  out[order(-out$kg, out$name), c("country", "name", "kg", "share", "value_nok", "years_with_imports", "main_commodity")]
+}
+
+# Warnings shown under a pathway's tables.
 pathway_notes <- function(pathway, r) {
   n <- character()
   if (pathway == "plants_for_planting") {
@@ -48,76 +72,82 @@ pathway_notes <- function(pathway, r) {
            "Soil associated with host plants belongs to this pathway but has no CN line.")
   }
   if (pathway == "wood") {
-    if ("non_conifer" %in% r$groups) n <- c(n, "Non-conifer wood lines are not matched to host genera. Class is an upper bound.")
-    n <- c(n, "Wood packaging: CN 4415 only captures packaging traded as goods. Most packaging travels with other products and has no SSB line.",
+    n <- c(n, "Genus-specific wood lines (e.g. birch, oak, pine) count only for host genera; mixed lines (firewood, chips, waste, packaging) are an upper bound.",
+           "Wood packaging: CN 4415 only captures packaging traded as goods. Most packaging travels with other products and has no SSB line.",
            "Bark is part of this pathway; isolated bark is counted in the wood waste lines (4401 40-49).")
   }
   n
 }
 
+simple_table <- function(header, rows, right = integer()) {
+  th <- lapply(seq_along(header), function(j) shiny::tags$th(class = if (j %in% right) "text-end", header[j]))
+  shiny::tags$table(class = "table table-sm align-middle",
+    shiny::tags$thead(shiny::tags$tr(th)),
+    shiny::tags$tbody(lapply(rows, function(cells) shiny::tags$tr(lapply(seq_along(cells), function(j)
+      shiny::tags$td(class = if (j %in% right) "text-end", cells[[j]]))))))
+}
+
 class_rows_ui <- function(cl) {
   cl <- cl[order(match(cl$group, names(group_label))), ]
   if (sum(cl$role == "info") < 2) cl <- cl[cl$role == "ent3", ]  # one group: info row would repeat ENT3
-  stat_head <- paste0(cl$stat[1], " kg/year, ", cl$years[1])
-  rows <- lapply(seq_len(nrow(cl)), function(i) {
-    x <- cl[i, ]
-    shiny::tags$tr(
-      class = if (x$role == "ent3") "fw-semibold" else "text-muted",
-      shiny::tags$td(group_label[[x$group]]),
-      shiny::tags$td(class = "text-end", fmt_num(x$kg)),
-      shiny::tags$td(class_badge(x$class, official = x$role == "ent3")),
-      shiny::tags$td(class = "text-end", fmt_num(x$kg_pest_present)),
-      shiny::tags$td(class = "text-end", fmt_pct(x$share_pest_present))
-    )
-  })
-  shiny::tags$table(
-    class = "table table-sm align-middle",
-    shiny::tags$thead(shiny::tags$tr(
-      shiny::tags$th("Host commodities"),
-      shiny::tags$th(class = "text-end", paste0("All origins (", stat_head, ")")),
-      shiny::tags$th("ENT3 class"),
-      shiny::tags$th(class = "text-end", "From pest-present origins (kg/year)"),
-      shiny::tags$th(class = "text-end", "Share from pest-present origins")
-    )),
-    shiny::tags$tbody(rows)
+  rows <- lapply(seq_len(nrow(cl)), function(i) list(
+    group_label[[cl$group[i]]], fmt_num(cl$kg[i]), class_badge(cl$class[i], official = cl$role[i] == "ent3")))
+  simple_table(c("Host commodities", paste0(cl$stat[1], " kg/year, all origins, ", cl$years[1]), "ENT3 class"),
+               rows, right = 2)
+}
+
+present_ui <- function(r, lines, stat_years, total_kg) {
+  po <- present_origins(r$imports, lines, stat_years, r$present_countries, total_kg, r$country_names)
+  with_imp <- po[po$kg > 0, ]
+  without <- po[po$kg == 0, ]
+  shiny::tagList(
+    shiny::h6(class = "mt-3", paste0("Imports from countries where the pest is present (median kg/year ",
+                                     min(stat_years), "-", max(stat_years), ")")),
+    shiny::p(class = "small text-muted mb-1", paste0(
+      fmt_num(sum(po$kg)), " kg/year from ", nrow(with_imp), " of ", nrow(po), " pest-present countries (",
+      fmt_pct(if (is.na(total_kg) || total_kg == 0) NA else sum(po$kg) / total_kg), " of all imports). Context, not ENT3.")),
+    if (nrow(with_imp) > 0) simple_table(
+      c("Country", "kg/year", "Share of all imports", "NOK/year", "Years with imports", "Main commodity"),
+      lapply(seq_len(nrow(with_imp)), function(i) list(
+        with_imp$name[i], fmt_num(with_imp$kg[i]), fmt_pct(with_imp$share[i]), fmt_num(with_imp$value_nok[i]),
+        paste0(with_imp$years_with_imports[i], " / ", length(stat_years)), substr(with_imp$main_commodity[i], 1, 70)
+      )), right = 2:5),
+    if (nrow(without) > 0) shiny::p(class = "small", shiny::tags$b("No recorded imports from: "),
+                                    paste(without$name, collapse = ", "))
   )
 }
 
-origins_ui <- function(r, cn8_table, pathway, stat_years) {
-  lapply(r$groups, function(g) {
-    lines <- cn8_lines(cn8_table, pathway, g, r$monocot)
-    o <- origin_summary(r$imports, lines, stat_years, r$present_countries, "kg", r$country_names)
-    bark <- if (pathway == "wood") bark_subtotal(r$imports, lines, stat_years) else NA
-    shiny::div(
-      shiny::h6(paste0("Top origins, ", g, " (median kg/year ", min(stat_years), "-", max(stat_years), ")")),
-      if (nrow(o) == 0) shiny::p("No imports recorded.") else shiny::tags$table(
-        class = "table table-sm",
-        shiny::tags$thead(shiny::tags$tr(shiny::tags$th("Origin"), shiny::tags$th("kg"),
-                                         shiny::tags$th("NOK"), shiny::tags$th("Pest present"))),
-        shiny::tags$tbody(lapply(seq_len(nrow(o)), function(i) shiny::tags$tr(
-          shiny::tags$td(paste0(o$name[i], " (", o$country[i], ")")),
-          shiny::tags$td(fmt_num(o$quantity[i])), shiny::tags$td(fmt_num(o$value_nok[i])),
-          shiny::tags$td(if (o$pest_present[i]) shiny::span(class = "text-danger", "● present") else "")
-        )))
-      ),
-      if (!is.na(bark)) shiny::p(class = "small text-muted",
-        paste0("Information only: round wood with bark, median ", fmt_num(bark), " kg/year (not ENT3)."))
-    )
-  })
+origins_ui <- function(r, lines, stat_years) {
+  o <- origin_summary(r$imports, lines, stat_years, r$present_countries, r$country_names)
+  if (nrow(o) == 0) return(shiny::p("No imports recorded."))
+  simple_table(c("Origin", "kg/year", "NOK/year", "Pest present"),
+    lapply(seq_len(nrow(o)), function(i) list(o$name[i], fmt_num(o$kg[i]), fmt_num(o$value_nok[i]),
+      if (o$pest_present[i]) shiny::span(class = "text-danger", "● present") else "")), right = 2:3)
+}
+
+bark_subtotal <- function(imports, lines, stat_years) {
+  wb <- lines[grepl("with_bark", lines$flags), ]
+  if (nrow(wb) == 0) return(NA_real_)
+  stats::median(annual_totals(imports, wb, stat_years)$quantity)
 }
 
 pathway_block_ui <- function(p, r, cn8_table, settings) {
   head <- shiny::h5(class = "mt-3", pathway_label(p))
   if (pathway_type(p) == "manual") {
-    return(shiny::tagList(head, shiny::div(class = "alert alert-secondary py-2",
-      "Not computed in v1. Assess manually.")))
+    return(shiny::tagList(head, shiny::div(class = "alert alert-secondary py-2", "Not computed in v1. Assess manually.")))
   }
   cl <- r$classes[r$classes$pathway == p, ]
   stat_years <- utils::tail(r$years, settings$volume_n)
+  lines <- cn8_lines(cn8_table, p, r$groups, r$monocot, r$host_genera)
+  total <- cl$kg[cl$role == "ent3"]
+  bark <- if (p == "wood") bark_subtotal(r$imports, lines, stat_years) else NA
   shiny::tagList(
     head, class_rows_ui(cl),
+    present_ui(r, lines, stat_years, total),
     shiny::div(class = "alert alert-warning py-2", lapply(pathway_notes(p, r), shiny::p, class = "mb-1")),
-    shiny::tags$details(open = NA, shiny::tags$summary("Top origins"), origins_ui(r, cn8_table, p, stat_years))
+    shiny::tags$details(open = NA, shiny::tags$summary("Top origins (all countries)"), origins_ui(r, lines, stat_years)),
+    if (!is.na(bark)) shiny::p(class = "small text-muted",
+      paste0("Information only: round wood with bark, median ", fmt_num(bark), " kg/year (not ENT3)."))
   )
 }
 
@@ -125,8 +155,7 @@ mod_table_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::uiOutput(ns("summary")),
-    shiny::p(class = "small text-muted",
-      "'none recorded' means no imports in the data; you decide. All quantities in kg."),
+    shiny::p(class = "small text-muted", "'none recorded' means no imports in the data; you decide. All quantities in kg."),
     shiny::downloadButton(ns("csv"), "Download CSV", class = "btn-sm")
   )
 }

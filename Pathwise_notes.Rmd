@@ -184,4 +184,7 @@ https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
 Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
 
 ## Open questions for me
+1. **OpenAI model.** Write-ups use `gpt-5.5-2026-04-23` (pinned dated release; the key also offers newer gpt-6 variants). Keep it, or pick another in `config.yml` (`llm.model`)?
+2. **Step 11 (model comparison).** The plan compared Claude and 2-3 Hugging Face models. With OpenAI chosen, still wanted, or skip?
+3. **Step 12 (deploy on the second laptop with a Cloudflare tunnel).** Go ahead when you are ready, or later?
 

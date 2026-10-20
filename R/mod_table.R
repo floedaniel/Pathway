@@ -38,9 +38,16 @@ country_medians <- function(imports, lines, stat_years) {
 # CN8 code without SSB's version suffix ("06029021_2011" -> "06029021").
 cn8_code <- function(x) sub("_.*$", "", x)
 
-# SSB description of a CN8 line (cut to `width` characters for display).
+# Text of CN8 lines: the customs tariff wording when available (current lines),
+# else the SSB label.
+cn8_text <- function(lines) {
+  t <- lines$tariff_description %||% rep(NA_character_, nrow(lines))
+  ifelse(!is.na(t) & nzchar(t), t, lines$description)
+}
+
+# Description of a CN8 line (cut to `width` characters for display).
 cn8_description <- function(cn8, lines, width = Inf) {
-  d <- lines$description[match(cn8, lines$cn8)]
+  d <- cn8_text(lines)[match(cn8, lines$cn8)]
   ifelse(is.na(d), NA, ifelse(nchar(d) > width, paste0(substr(d, 1, width), "..."), d))
 }
 
@@ -59,7 +66,7 @@ line_summary <- function(imports, lines, stat_years, present, total_kg) {
   rows <- lapply(seq_len(nrow(lines)), function(i) {
     l <- lines[i, ]
     tibble::tibble(
-      cn8 = l$cn8, code = cn8_code(l$cn8), description = l$description, flags = l$flags,
+      cn8 = l$cn8, code = cn8_code(l$cn8), description = cn8_text(l), flags = l$flags,
       kg = stats::median(annual_totals(imports, l, stat_years)$quantity),
       kg_pest_present = stats::median(annual_totals(imports, l, stat_years, "pest_present", present)$quantity)
     )
@@ -211,7 +218,7 @@ lines_ui <- function(r, lines, stat_years, total_kg) {
   shiny::tagList(
     simple_table(c("CN8", "Description", "kg/year", "Share of total", "From pest-present origins (kg/year)", "Flags"),
       lapply(seq_len(nrow(used)), function(i) list(
-        shiny::tags$code(used$code[i]), substr(used$description[i], 1, 90), fmt_num(used$kg[i]),
+        shiny::tags$code(used$code[i]), used$description[i], fmt_num(used$kg[i]),
         fmt_pct(used$share[i]), fmt_num(used$kg_pest_present[i]), gsub(";", ", ", used$flags[i]))), right = 3:5),
     if (nrow(ls) > nrow(used)) shiny::p(class = "small text-muted", paste0(
       "No recorded imports on ", nrow(ls) - nrow(used), " further line(s): ",

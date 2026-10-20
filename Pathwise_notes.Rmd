@@ -177,6 +177,11 @@ Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after 
 - Source: Lovdata public data (open, updated daily), bulk archive of current central regulations: https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2 (file `sf/sf-20001201-1333.xml`). Service description: https://api.lovdata.no/om-api-tjenesten/
 - Key annexes: vedlegg 1 and 2 (regulated pests, vedlegg 2 with host genera), 3 (origin bans), 4A (import requirements), 5A (certificate requirements; nr. 1 plants, nr. 8 wood scope).
 
+## Customs tariff (Tolletaten)
+- Dataset: https://data.toll.no/no/dataset/tolltariffstruktur (open data, the Norwegian customs tariff structure: section > chapter > heading > subheadings > 8-digit item, with HS6 number and references).
+- JSON used: https://data.toll.no/dataset/6350e783-b989-4c7c-9ec0-de2dcb97363c/resource/68f78255-cbb0-4e75-86b1-3d5928816903/download/tolltariffstruktur.json (version 1.5; copy in `docs/reference/tolltariffstruktur.json`).
+- Used by `dev/build_commodity_cn8.R` for the full wording of each current CN8 line (`tariff_description`). SSB labels are often shortened: 06029021 is "trær og busker ikke nevnt ovenfor; draketre (Dracaena) og palmer (Palmae)", not only the genera SSB lists.
+
 ## OpenAI (write-up)
 - Provider and model in `config.yml` (`llm.provider: openai`, `llm.model: gpt-5.5-2026-04-23`). Key: env `OPENAI_API_KEY` or `API_kays/tore_vkm_openai.txt`.
 

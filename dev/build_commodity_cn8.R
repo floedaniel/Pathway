@@ -106,9 +106,10 @@ genus_rules <- list(
   "^440795" = "Fraxinus", "^440796" = "Betula", "^440797" = "Populus",
   "^44160010" = "Quercus",
   "^060230" = "Rhododendron", "^060240" = "Rosa",
-  # plant lines that list their genera in the label (palmer = family Arecaceae;
-  # kransgran = Sciadopitys, a conifer, hence group "both")
-  "^06029021" = "Buxus;Dracaena;Laurus;Camellia;Sciadopitys;Ilex;Magnolia;Arecaceae;Hamamelis;Chimonanthus",
+  # plant lines whose tariff text names their genera. (06029021 is NOT one: the
+  # customs tariff defines it as "trær og busker ikke nevnt ovenfor; draketre
+  # (Dracaena) og palmer (Palmae)", i.e. all trees and shrubs with soil n.e.s.;
+  # SSB's label only lists examples. Corrected 2026-10-20.)
   "^06021024" = "Pelargonium",
   "^06021025" = "Chrysanthemum;Saintpaulia;Scaevola;Streptocarpus"
 )
@@ -140,8 +141,28 @@ category_rules <- list(
 out$eppo_category <- apply_rules(category_rules)
 stopifnot(all(nzchar(out$eppo_category)))
 
-out <- out[, c("pathway", "cn8", "description", "commodity_group", "eppo_category", "genus", "excludes_genera",
-               "flags", "source", "valid_from", "valid_to", "notes", "reviewed")]
+# ---- full wording from the Norwegian customs tariff (Tolletaten, data.toll.no) ---
+# The tariff structure gives each current 8-digit item with its full hierarchy
+# (heading > subheadings > item). SSB labels are often shortened (e.g. 06029021).
+# Lines no longer in the tariff (expired codes) keep only the SSB label.
+tariff_url <- "https://data.toll.no/dataset/6350e783-b989-4c7c-9ec0-de2dcb97363c/resource/68f78255-cbb0-4e75-86b1-3d5928816903/download/tolltariffstruktur.json"
+tariff <- jsonlite::fromJSON(tariff_url, simplifyVector = FALSE)
+items <- list()
+walk <- function(node, path) {
+  label <- node$beskrivelse %||% node$vareslag %||% ""
+  p <- c(path, if (!node$type %in% c("avsnitt", "kapittel")) label)
+  if (identical(node$type, "vare")) items[[node$id]] <<- paste(p[nzchar(p)], collapse = " > ")
+  for (k in c("avsnitt", "kapitler", "inndelinger", "oppdelinger", "posisjoner")) for (ch in node[[k]] %||% list()) walk(ch, p)
+}
+for (a in tariff$avsnitt) walk(a, character())
+code8 <- sub("_.*$", "", out$cn8)
+current <- is.na(out$valid_to)
+out$tariff_description <- ifelse(current & code8 %in% names(items), unlist(items)[code8], "")
+cat("tariff version", tariff$versjon, "- current lines with tariff text:", sum(nzchar(out$tariff_description)),
+    "of", sum(current), "\n")
+
+out <- out[, c("pathway", "cn8", "description", "tariff_description", "commodity_group", "eppo_category", "genus",
+               "excludes_genera", "flags", "source", "valid_from", "valid_to", "notes", "reviewed")]
 write.csv(out, "data/commodity_cn8.csv", row.names = FALSE, na = "", fileEncoding = "UTF-8")
 print(table(out$pathway, out$commodity_group))
 excluded <- d[!is.na(entry) & !wood_sel, c("cn8", "description")]

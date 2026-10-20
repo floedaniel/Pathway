@@ -17,11 +17,16 @@ test_that("host families do not switch on residual lines (Betula + Betulaceae)",
   expect_false("44079900_2017" %in% w$cn8)
 })
 
-test_that("lines that list genera (06029021: Buxus, Ilex, ... palms) need a host in the list", {
+test_that("06029021 is all trees and shrubs with soil n.e.s. (customs tariff), so it counts for birch", {
   p <- cn8_lines(cn8_table, "plants_for_planting", "non_conifer", host_genera = list(non_conifer = c("Betula", "Betulaceae")))
-  expect_false("06029021_2011" %in% p$cn8)
-  palm <- cn8_lines(cn8_table, "plants_for_planting", "non_conifer", host_genera = list(non_conifer = c("Phoenix", "Arecaceae")))
-  expect_true("06029021_2011" %in% palm$cn8)
+  expect_true("06029021_2011" %in% p$cn8)
+  c <- cn8_lines(cn8_table, "plants_for_planting", "conifer", host_genera = list(conifer = c("Pinus", "Pinaceae")))
+  expect_true("06029021_2011" %in% c$cn8)
+})
+
+test_that("lines that list genera in the tariff (06021024 Pelargonium) need a host in the list", {
+  p <- cn8_lines(cn8_table, "plants_for_planting", "non_conifer", host_genera = list(non_conifer = c("Betula", "Betulaceae")))
+  expect_false("06021024_2001" %in% p$cn8)
 })
 
 test_that("a host outside the genus-specific lines brings in the residual line", {

@@ -1,18 +1,308 @@
 ---
 title: "Pathwise Notebook"
 output: html_notebook
-editor_options: 
+editor_options:
   chunk_output_type: inline
 ---
 
-# Plan: Pathwise, pest import risk Shiny app (R)
+# How to use this file
+
+This is the project memory for Pathwise. Read it before starting work.
+
+- **Part 1, Current state:** what is actually built, deployed and decided, as of the date at its top. Newest truth.
+- **Part 2, Reference:** external sources, endpoints, limits.
+- **Part 3, Q & A:** open questions for the user. Answered questions move to `docs/decisions.md` (decisions, numbered and dated) or `docs/findings.md` (what the APIs and the regulation turned out to contain).
+- **Appendix A, Original plan:** the plan as first written (2026-10-20). Kept for history; where it conflicts with Part 1 or `docs/decisions.md`, those win.
+
+Working agreements (from the user):
+
+- The user steers through this file ("see notes"). Keep the Q & A current: add new questions, remove answered ones.
+- Commit and push often (GitHub, HTTPS remote).
+- Never guess thresholds, codes, mappings or FinnPRIO fields; take them from tables or ask.
+- Never commit or bundle keys. Keys only in env vars or the git-ignored `API_kays/` folder.
+- EPPO, SSB and Lovdata results are deterministic; the LLM never sets numbers or classes.
+- Tables follow tidy principles: one value per column, CN8 code in its own column.
+- UI and write-up in English (Norwegian names only for searching Lovdata and SSB labels).
+- Test species: `C:\Users\dafl\Downloads\master_species.xlsx` (318 pests). Bark beetles such as *Ips* spp. and AGRLAX (*Agrilus anxius*) are the usual checks.
+
+# Part 1: Current state (2026-10-20)
+
+## Status
+
+- **App:** complete for v1. Single input, four panels, LLM write-up. All 318 test pests run through the pipeline without R errors (final debugging pass, decision 45).
+- **Tests:** 233 offline tests pass (`testthat::test_dir("tests/testthat")`).
+- **Git:** https://github.com/floedaniel/Pathway, branch `main`, 26 commits, last `a11a7bf` (deploy script). Tree in sync with origin.
+- **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
+  - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
+  - Dashboard: https://connect.posit.cloud/danielflow/content/01a158ac-9fd3-b5d5-8776-1d40f1995348
+  - Start page verified (HTTP 200, input visible, so the keys arrived). A full run on the server has not been tested yet.
+
+## What the app does
+
+Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant commodity is traded into the PRA area annually?", for Norway.
+
+**Input:** one centred field, "EPPO code or scientific name" (e.g. `AGRLAX` or `Agrilus anxius`), and Run. No checkboxes; the pathways shown are the ones derived for the pest.
+
+**Flow** (`run_assessment()` in `R/pipeline.R`):
+
+1. **Resolve input** (`resolve_input()`): an EPPO code is checked; an inactive code follows `replacedby` (e.g. LITYMC -> LITYCR). A name goes through `tools/name2codes` (preferred names first, then all names). Unknown -> stop "Unknown or non-pest EPPO code or name."
+2. **EPPO host commodities:** scraped from `gd.eppo.int/taxon/{code}/pathwayshosts` (no API endpoint), cached 30 days. Category + host genus per row.
+3. **Hosts:** EPPO hosts, classes Major host and Host only. Stops: no hosts; no Major host/Host.
+4. **Classify hosts** from the EPPO taxonomy lineage: conifer / non_conifer / not_plant, plus family, genus and monocot flag. No plant host -> stop.
+5. **Present countries:** EPPO distribution statuses starting with "Present". None -> stop.
+6. **Choose pathways** (`choose_pathways()`): from the host-commodity list via `data/eppo_commodity_map.csv`; if the list is empty or gives no computed pathway (e.g. soil only), fall back to host plants, labelled in the header.
+7. **SSB 08801:** imports (kg, NOK) of the pathway's CN8 lines, all origin countries, 10 years (2016-2025). Median annual kg over all origins -> FinnPRIO class.
+8. **Host search in SSB:** every 08801 label is searched for each host genus (Latin and Norwegian names), every hit listed with its status.
+9. **Lovdata:** units of FOR-2000-12-01-1333 naming the pest, then origin rules (host genus + pest-present country), then host-only units.
+10. **Write-up:** fixed layout filled by R; the LLM writes one sentence per Lovdata unit.
+
+**Stops** are typed conditions (`stop_app()` in `R/conditions.R`) shown as one red alert; nothing else renders and no LLM call is made. Messages: invalid_code, no_hosts, no_main_minor, no_plant_hosts, no_distribution, unit_mismatch ("expected kg"), no_pathway, missing_secret, bad_config.
+
+**Screen:**
+
+- **Header strip:** pest and code, where pathways come from (EPPO host commodities with count, or host plants with the reason), host counts (conifer / non-conifer / not plants), number of present countries, years.
+- **Panel 1, SSB table:** per pathway one block.
+  - Class rows: `All host commodities (ENT3)` = median kg/year over all origins and the class; columns: host commodities | median kg/year | ENT3 class | kg from pest-present origins | share. Conifer / non-conifer group rows only when both groups exist (information).
+  - Notes on the basis (EPPO list or fallback) and upper bounds.
+  - "CN8 lines in this pathway": code, tariff description, median kg/year, share, kg from pest-present origins, flags.
+  - Pest-present origins table: Country | ISO | kg/year | Share | NOK/year | Years with imports (of N) | Main CN8 code | Main CN8 description; countries without imports listed.
+  - Top origins (open by default), same tidy columns plus "Pest present" yes/no.
+  - Wood: with-bark subtotal (information).
+  - "Host search in SSB table 08801": CN8 code | Valid | SSB label | Host | Matched term | Status.
+- **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Switch: all origins / pest-present origins only. Caption explains the bars. PNG download. No "*" marker (removed on request).
+- **Panel 3, Lovdata:** snippets with id (e.g. "Vedlegg 2, nr. 10"), link, copy button.
+- **Panel 4, FinnPRIO write-up:** per computed pathway an editable text box, Copy, Regenerate, labelled with its source (model or fallback).
+- **Derived inputs** (collapsed): present countries, EPPO host-commodity table (category, host, EPPO code, FinnPRIO pathway, status), host plant table.
+- **Footer:** fetch dates only (EPPO, SSB with table update date, Lovdata, thresholds reviewed). The disclaimer sentence was removed on request.
+
+## Method details
+
+### Host classification (`R/classify_hosts.R`, decision 19)
+- conifer: lineage contains Pinopsida, Pinales or Coniferales.
+- non_conifer: any other plant (kingdom Plantae), incl. herbaceous plants, cycads, Ginkgo, ferns. No woody test (the woody list was dropped).
+- monocot: EPPO category "Basal monocotyledons" or "Commelinids".
+- EPPO commodity groups used as hosts: 2PLAN plants and 2WOOP woody plants -> all plants (both groups, no genus filter); 2VEGP, 2FRUP, 2ORNH, 2HERP -> non_conifer. Unknown group -> all plants.
+- Taxonomy cached permanently per host code.
+
+### Pathways (`R/pathways.R`, `data/eppo_commodity_map.csv`)
+FinnPRIO ids. Hitchhiking, natural spread and intentional introduction are removed (decision 27).
+
+| EPPO category | FinnPRIO pathway | Status | CN8 scope |
+|---|---|---|---|
+| plants for planting | plants_for_planting | computed | 0602 |
+| bulbs or tubers | plants_for_planting | computed | 0601 |
+| non-squared wood | wood | computed | 4403, 4401 firewood/chips, 4404 |
+| squared wood | wood | computed | 4406, 4407 |
+| bark | wood | computed | 4401 40-49 waste incl. bark |
+| packaging material | wood | computed | 4415 (only packaging traded as goods) |
+| manufactured articles | wood | computed | 4416, 9406.10 (partial; 4409-4421 not included) |
+| plant waste | wood | computed | 4401 40-49 (partial) |
+| seeds | seeds | manual | - |
+| cut flowers or branches, pollen | other_plant_parts | manual | - |
+| fruits or vegetables, stored products | food_fodder | manual | - |
+| soil/growing medium, agricultural machinery, all commodities | - | info | no CN line |
+
+Fallback (no EPPO list, or a list with only info categories such as soil): both computed pathways (plants_for_planting and wood) for all host plants, with all their CN8 categories; 0601 counts only when a host is a monocot (`choose_pathways()`, `pathway_info()`). With an EPPO list, 0601 follows the list (bulbs or tubers) instead of the monocot rule.
+
+### CN8 lines (`data/commodity_cn8.csv`, built by `dev/build_commodity_cn8.R`)
+- 134 lines: 32 plants_for_planting, 102 wood. Built from SSB metadata + the customs tariff JSON.
+- Columns: pathway, cn8 (versioned, e.g. `06029021_2011`), description (SSB), tariff_description, tariff_label (unique short label), commodity_group (conifer / non_conifer / both / monocot), eppo_category, genus, excludes_genera, flags (upper_bound, mixed, waste, with_bark, ...), source, valid_from, valid_to, notes, reviewed.
+- Scope: plants = all 0602 (vedlegg 5A nr. 1) + 0601; wood = vedlegg 5A nr. 8 scope matched on wording + 9406.10. Out: tropical wood, eucalyptus round wood, pellets/briquettes, impregnated/treated wood.
+- **Genus filter** (decisions 33, 39, 44, 45): genus-specific lines (furu/Pinus, gran = Picea AND Abies per tariff, eik/Quercus, bøk/Fagus, bjørk/Betula, poppel/osp Populus, ask/Fraxinus, lønn/Acer, kirsebær/Prunus, Rhododendron, Rosa, Pelargonium, Chrysanthemum lists) count only when a host is in the genus. Residual lines ("other conifers / broadleaved") count only when a host genus is outside the listed genera; judged on genera only, not families. Mixed lines count for any host. Hosts known only above genus are not filtered.
+- 06029021 is all trees and shrubs with soil n.e.s. (tariff), not the genera SSB's short label lists. Its genus restriction was a bug and is removed.
+- Rebuild after SSB or tariff changes: `Rscript dev/build_commodity_cn8.R` (also writes `data/genus_names_no.csv`).
+
+### Volume class (`R/volume_class.R`)
+- `data/finnprio_thresholds.csv`: `x < 1,000,000` small; `x <= 10,000,000` medium; else large. kg only.
+- Aggregate all origins per year first, then the median over 10 years, then classify.
+- `all_hosts` row (union of lines, role `ent3`) is the ENT3 answer; group rows are info.
+- No imports -> "none recorded" (not `non_existent`); the assessor decides.
+- Pest-present imports are shown as kg and share, never as a class (Class B removed, decision 29).
+
+### Host search in SSB (`R/host_search.R`, decision 47)
+- User's rule: always search SSB 08801 for the host plants (e.g. bjørk for *A. anxius*).
+- Terms: genus (Latin) + Norwegian names from `data/genus_names_no.csv` (131 names from the tariff). Whole words only.
+- Exclusion clauses ("unntatt bjørk", "unnt av bartrær, eik", "ikke ...") are stripped first; a line excludes the host only if every matched term sits in an exclusion clause.
+- Status per hit: "counted: <pathway>", "label excludes the host", "not counted: impregnated wood is excluded", "not counted: heading XXXX is outside the app's CN8 scope". ENT3 numbers are not changed by the search.
+
+### Lovdata (`R/law_index.R`)
+- Bulk archive `gjeldende-sentrale-forskrifter.tar.bz2` (21 MB), file `sf/sf-20001201-1333.xml`, parsed into 305 units (§ articles, annex rows, annex paragraphs). Cached 7 days.
+- Terms: pest names + EPPO synonyms; higher taxa only as "<taxon> spp." (genus alone is no hit); aliases in `data/law_taxon_aliases.csv` (Scolytinae -> Scolytidae; Pinopsida -> Coniferales / bartrær); host genera; Norwegian country names of pest-present countries.
+- Tiers: pest_match, then origin_rule (host genus + pest-present country), then host only.
+
+### Write-up (`R/prompts.R`, `R/mod_writeup.R`, decisions 40, 46)
+Fixed layout, numbers and codes filled by R:
+
+```text
+ENT3: Large
+
+Annual import into Norway of <scope>: 19.1 million kg (median 2016-2025). The figure covers all ... so it is an upper bound.
+<basis sentence>
+
+Largest CN8 lines (kg per year, share of total):
+<tariff label> (<code>): <mass> (<share>[, mixed line])
+
+Imports from countries where the pest is present (information only, not ENT3):
+<Country>: <mass> per year (median 2016-2025)
+  <tariff label> (<code>): <mass> in total 2016-2025
+<Country>: no recorded imports
+
+Regulation:
+<Lovdata id>: <one LLM sentence>
+
+Note: <pathway notes>
+```
+
+- The LLM (OpenAI, `gpt-5.5-2026-04-23`) writes only the Regulation lines: one sentence per unit, each must start with a Panel 3 id (`validate_regulation()`); otherwise the unit text is shown (`regulation_fallback()`). Cached per units + model; Regenerate bypasses the cache.
+- Units: those naming the pest, then origin rules, in regulation order.
+
+## Code map
+
+| File | Role |
+|---|---|
+| `app.R` | UI (bslib page_fluid), server, copy-button JS. Loads keys, settings, CN8 table at start. |
+| `R/settings.R` | `load_local_keys()` (reads `API_kays/`, env vars win), `load_settings()`, `check_secrets()`. |
+| `R/conditions.R` | `stop_app()` typed stops. |
+| `R/cache.R` | `cached(source, query, fetch, settings)`, digest key, TTL per source, files in `cache/`. |
+| `R/api_eppo.R` | EPPO API v2 client, gd.eppo.int scraper (`eppo_host_commodities()`), `resolve_input()`, hosts, present countries. |
+| `R/classify_hosts.R`, `R/host_to_groups.R` | Lineage classification; groups for the run. |
+| `R/api_ssb.R` | SSB metadata and imports (chunks of 25 lines), `cn8_lines()`, `pathway_lines()`, genus filter. |
+| `R/volume_class.R` | Thresholds, `annual_totals()`, `classify_volume()`, `classify_pathway()`. |
+| `R/pathways.R` | FinnPRIO pathway ids, labels, types. |
+| `R/pipeline.R` | `run_assessment()`, `choose_pathways()`, `pathway_info()`, `pinfo()`. |
+| `R/host_search.R` | Host search in SSB labels. |
+| `R/law_index.R` | Lovdata download, parse, index, search. |
+| `R/prompts.R`, `R/llm_provider.R` | Write-up layout, regulation prompt, validation; `llm_chat()` via ellmer (openai / claude / hf). |
+| `R/mod_input.R`, `mod_table.R`, `mod_graph.R`, `mod_law.R`, `mod_writeup.R` | Shiny modules: input and panels 1-4. |
+| `dev/build_commodity_cn8.R` | Builds `data/commodity_cn8.csv` and `data/genus_names_no.csv`. |
+| `dev/record_eppo_fixtures.R` | Records EPPO responses for the tests. |
+| `dev/write_manifest.R` | Writes `manifest.json` (for Git-based Connect Cloud deploys). |
+| `dev/deploy.R` | Deploys to Posit Connect Cloud. |
+
+**Data files:** `commodity_cn8.csv`, `eppo_commodity_map.csv` (16 categories), `finnprio_thresholds.csv`, `country_map.csv` (only SSB exceptions CS_, XI, 97; other Land codes are ISO2), `law_taxon_aliases.csv`, `genus_names_no.csv`, `data/law/` (downloaded archive, git-ignored).
+
+**Docs:** `README.md` (user guide; partly out of date, see Open questions), `docs/decisions.md` (decisions 1-48), `docs/findings.md`, `docs/reference/eppo_gd_general_user-guide.pdf`, `docs/reference/tolltariffstruktur.json`.
+
+## Configuration and keys
+
+- `config.yml`: host_classes [Major host, Host]; ssb_years 10; volume_n 10; volume_stat median; llm provider openai, model gpt-5.5-2026-04-23, hf_base_url; language en; cache dir and TTL days (eppo 30, eppo_taxonomy never, ssb 30, lovdata 7, llm never).
+- Keys (env var wins, else file in `API_kays/`):
+  - `EPPO_KEY` = `API_kays/EPPO_beta.txt`
+  - `OPENAI_API_KEY` = `API_kays/tore_vkm_openai.txt`
+  - `ANTHROPIC_API_KEY` = `API_kays/anthropic_key.txt`, `HF_TOKEN` = `API_kays/hugging_face.txt` (alternative providers)
+- `check_secrets()` stops at start if a needed key is missing. SSB and Lovdata need no key.
+- `.gitignore` covers `.Renviron`, key patterns, `API_kays/`, `API_keys/`, `cache/`, renv library, Lovdata archive, `*.png`, `rsconnect/`.
+
+## Deployment (Posit Connect Cloud)
+
+- Redeploy after code changes: `Rscript dev/deploy.R` from the project root. It reads the keys into the R session, sends them as encrypted environment variables (`envVars`), uploads 31 files (no tests, dev, docs, cache, keys, notes) and updates the same app (`appName = "pathwise"`, `forceUpdate = TRUE`). The script refuses to run if a key file would be in the bundle.
+- After package changes: `renv::snapshot()`, then `Rscript dev/write_manifest.R` (113 packages, R 4.5.3), commit.
+- The rsconnect records go to `rsconnect/` (git-ignored). A second account `danielapp@shinyapps.io` also exists but is not used.
+- If envVars are ever ignored, set `EPPO_KEY` and `OPENAI_API_KEY` as secrets in the Connect Cloud UI.
+- Caveats:
+  - The app is public on the free plan: anyone with the link can run it, which uses the EPPO and OpenAI keys (small cost per run). Access can be restricted in the dashboard.
+  - The first run on a fresh server is slow: it downloads the Lovdata archive and fills the caches. The cache does not survive restarts of the server.
+
+## Known limitations
+
+- Import statistics are recorded trade, not pest pressure or entry.
+- CN8 lines cover whole commodity groups, so most classes come out `large` (upper bound). Pest-present share helps judge relevance.
+- Conifer plants for planting appear only in catch-all 0602 lines.
+- Most wood packaging travels with other goods and has no SSB line (4415 = packaging traded as goods).
+- Manufactured articles are partial (4416, 9406.10 only); veneer 4408, plywood 4412, profiled wood 4409 show up in the host search as "outside scope" (Open question 5).
+- Dicot bulbs/tubers are missed when EPPO has no list; soil has no CN line.
+- Seeds, food and fodder, and other plant parts are not computed (manual).
+- EPPO host commodities exist only for EPPO/EU-listed pests (80 % of A1/A2, 0 % of the Alert list); the rest use host plants.
+- Mattilsynet holds genus-level import data (§ 20, § 23a); a data request, not in v1.
+
+## Lessons and gotchas
+
+- **SSB short labels mislead.** Always check the customs tariff wording (06029021, 4403 23 = fir and spruce).
+- **Bash heredocs and `Rscript -e` halve backslashes** in regex. Write R scripts to a file with the Write tool and run them.
+- **renv:** RStudio must restart R (Session > Restart R) after renv is activated, else "there is no package called 'config'".
+- **Sourced code shares the global environment:** `do.call(c, ...)` picked up a global `c`; use `base::c`.
+- **Regex:** Unicode classes like `\\p{L}` need `perl = TRUE`; without it the pattern silently never matches.
+- **Genus vs higher taxon:** matching a pest's genus alone in Lovdata gave false hits (*Agrilus*); higher taxa count only as "X spp.".
+- **Families switch on residual lines:** judge residual CN8 lines on genera only.
+- Cold run ~30 s, cached a few seconds.
+- `app.R` has a user-added `library(config)`, which masks `base::get`/`merge` and prints a warning. Not needed (settings use `config::get()`); see Open question 6.
+
+## Results worth remembering
+
+- **AGRLAX (*Agrilus anxius*):** hosts all *Betula*, present in CA and US. EPPO list: plants for planting, squared and non-squared wood, bark, manufactured articles, packaging, all *Betula*. Before the genus filter 90 % of "non-conifer wood from pest-present countries" was oak; with it ~47 t/year (mostly pallets) instead of 5.3 million kg. Lovdata: Vedlegg 1 nr. 2.1 (pest), Vedlegg 4A nr. 45, origin rule Vedlegg 3 nr. 11 (*Betula* from Canada and USA).
+- **IPSXCA wood:** total 1.26 billion kg; pest-present origins 0.43 million kg.
+- **Sweep of 318 pests:** 215 get pathways from EPPO host commodities, the rest from host plants. XANTPD stops (no hosts in EPPO), which is correct.
+
+## History (commits)
+
+1. Step 1 scaffold (renv, config, cache, typed stops, secret check).
+2. Step 2 lookup tables, API choices; Steps 2-4 EPPO client, host classification (woody list draft, later replaced by the taxonomic rule).
+3. Step 5 Lovdata index and search.
+4. Steps 6-7 SSB client, ENT3 classes, pipeline. Step 8 Shiny UI. Simplification: kg only, median only, no fixed pathways, tidy Panel 1.
+5. Step 9 OpenAI write-up; README.
+6. Pest-present table, genus-specific CN8 lines, Lovdata origin rules; detailed write-up with CN8 codes; fixed write-up layout; tidy country tables.
+7. Pathways from EPPO host commodities; single input; checkboxes removed.
+8. Customs tariff wording (06029021 fix); final debugging pass; host search in SSB; UI clean-ups (footer text, "*" marker, legend with codes).
+9. Posit Connect Cloud: manifest, deploy script, published.
+
+Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; effectively replaced by Connect Cloud). See Open questions 2 and 3.
+
+# Part 2: Reference
+
+## Repository
+- GitHub: https://github.com/floedaniel/Pathway (public; remote `origin` uses HTTPS: `https://github.com/floedaniel/Pathway.git`; no SSH key on this machine).
+
+## EPPO Global Database API v2
+- Base URL `https://api.eppo.int/gd/v2`, key in header `X-Api-Key` (env `EPPO_KEY` or `API_kays/EPPO_beta.txt`). Rate limit 2000 requests / 10 s. Unknown codes return HTTP 400.
+- OpenAPI spec: https://api.eppo.int/gd/v2/eppo_api_gd_v2.yml. v1 (`data.eppo.int/api/rest/1.0`, `?authtoken=`) is legacy.
+- Endpoints used: `taxons/taxon/{code}/overview`, `/hosts`, `/taxonomy`, `/distribution`, `/names`; `references/distributionStatus`; `tools/name2codes`.
+- Host classes: Major host, Host, Alternate, Wild/Weed, Experimental, Doubtful host, Non-host (no "Minor host").
+- Host commodities: not in the API (only a count, `infos$pathwayhost`); HTML table `#dttable` on `https://gd.eppo.int/taxon/{code}/pathwayshosts`. User guide p. 13-14: `docs/reference/eppo_gd_general_user-guide.pdf`.
+- Not this: https://eppo.cloud/api/docs belongs to "Eppo", an unrelated A/B-testing company.
+
+## SSB, table 08801
+- External trade by CN8 commodity and country, 1988 to the latest complete year: https://www.ssb.no/en/statbank/table/08801 (same data as the /no/ page; the app reads labels in Norwegian and country names in English).
+- API: PxWebApi v2, `https://data.ssb.no/api/pxwebapi/v2/tables/08801/data` (open; max 800,000 cells per call, 40 calls/min). The old `api/v0` is legacy.
+- Used: Mengde1 = kg (every line) and Verdi = NOK. Mengde2 (pieces, m³) is not used.
+- Chapters: 06 = live plants (0601 bulbs and tubers, 0602 plants for planting); 44 = wood; 94.06.10 = prefabricated wooden buildings.
+- CN8 codes carry a version suffix (`06029098_2016`). Land codes are ISO2 except CS_, XI, 97.
+
+## Lovdata, FOR-2000-12-01-1333
+- Forskrift om planter og tiltak mot planteskadegjørere: https://lovdata.no/dokument/SF/forskrift/2000-12-01-1333
+- Source: Lovdata public data (open, updated daily), bulk archive of current central regulations: https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2 (file `sf/sf-20001201-1333.xml`). Service description: https://api.lovdata.no/om-api-tjenesten/
+- Key annexes: vedlegg 1 and 2 (regulated pests, vedlegg 2 with host genera), 3 (origin bans), 4A (import requirements), 5A (certificate requirements; nr. 1 plants, nr. 8 wood scope; tariff numbers in an older format).
+- Bark beetles: "Scolytidae spp. (ikke-europeiske arter)" (Vedlegg 2, nr. 10). Not named: Xylella, Aromia, Lymantria, Dendroctonus, Polygraphus, Fusarium circinatum.
+
+## Customs tariff (Tolletaten)
+- Dataset: https://data.toll.no/no/dataset/tolltariffstruktur (open data: section > chapter > heading > subheadings > 8-digit item, with HS6 number and references).
+- JSON used: https://data.toll.no/dataset/6350e783-b989-4c7c-9ec0-de2dcb97363c/resource/68f78255-cbb0-4e75-86b1-3d5928816903/download/tolltariffstruktur.json (version 1.5; copy in `docs/reference/tolltariffstruktur.json`). All 105 current CN8 lines of the app are in it.
+- Used by `dev/build_commodity_cn8.R` for `tariff_description`, `tariff_label` and the Norwegian genus names.
+
+## OpenAI (write-up)
+- Provider and model in `config.yml` (`llm.provider: openai`, `llm.model: gpt-5.5-2026-04-23`). Key: env `OPENAI_API_KEY` or `API_kays/tore_vkm_openai.txt`. Called through ellmer (`chat_openai`).
+
+## Posit Connect Cloud
+- Account `danielflow`, server `connect.posit.cloud`, app name `pathwise`. URLs in Part 1, Status.
+
+# Part 3: Q & A
+
+Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`.
+
+## Open questions for me
+1. **OpenAI model.** Write-ups use `gpt-5.5-2026-04-23` (pinned dated release; the key also offers newer gpt-6 variants). Keep it, or pick another in `config.yml` (`llm.model`)?
+2. **Step 11 (model comparison).** The plan compared Claude and 2-3 Hugging Face models. With OpenAI chosen, and the LLM now writing only the regulation sentences, still wanted, or skip?
+3. **Step 12 (laptop + Cloudflare tunnel).** The app now runs on Posit Connect Cloud. Drop Step 12?
+5. **Host search hits outside the scope.** Searching 08801 for the host (e.g. bjørk) also finds birch veneer sheets (4408) and plywood with a birch face (4412); for conifers also profiled wood (4409) and plywood. They are listed in Panel 1 as 'not counted' (outside Vedlegg 5A nr. 8). Should any of them count, e.g. for EPPO's 'manufactured articles'?
+6. **`library(config)` in app.R.** It masks `base::get` and `base::merge` and prints a warning at start; the app does not need it. Remove it?
+7. **Access to the online app.** It is public (anyone with the link, using your EPPO and OpenAI keys). Keep it public, restrict it in the Connect Cloud dashboard, or add a password?
+8. **README.** The user guide is partly out of date (says the graph marks pest-present origins with "*", write-up max 200 characters, 0601 only for monocots). Update it to match Part 1?
+
+# Appendix A: Original plan (2026-10-20, superseded where Part 1 or docs/decisions.md differ)
+
+Main changes since: single input is a code OR a name; pathways come from EPPO host commodities; woody list replaced by the taxonomic rule; kg only (no pc); median over 10 years; Class B replaced by pest-present kg and share; fixed pathways (hitchhiking etc.) removed; OpenAI instead of Claude/HF; write-up in a fixed layout with the LLM only for regulation sentences; footer disclaimers and the graph "*" removed; deployed on Posit Connect Cloud instead of a laptop.
 
 read whole plan before you start!
-Also see \old_scripts for old snippets that can be re used  
-
-## test species
-"C:\Users\dafl\Downloads\master_species.xlsx"
-use bark betles like Ips spp. 
+Also see \old_scripts for old snippets that can be re used
 
 ## Goal
 Single input: EPPO code of the pest (e.g. XYLEFA). Everything else is derived.
@@ -68,153 +358,39 @@ data/law/                           (Lovdata XML + index)
 config.yml
 tests/testthat/
 
-## data/finnprio_thresholds.csv
-commodity_group,unit,small_max,medium_max,source,reviewed
-*,kg,999999,10000000,FinnPRIO ENT3,2026-10-20
-*,pc,999999,10000000,FinnPRIO ENT3,2026-10-20
-(`*` = applies to all groups. Boundaries: <1,000,000 small; 1,000,000-10,000,000 medium; >10,000,000 large. Group-specific rows override `*`.)
-
 ## Flow
-1. Validate code: `/taxon/{code}` must exist and be a pest.
-   Else STOP: "Unknown or non-pest EPPO code."
-2. Hosts: `/taxon/{code}/hosts`, keep status `main` + `minor` (fixed in config, no UI toggle).
-   - No hosts at all -> STOP: "No hosts registered in EPPO for {code}. No assessment possible."
-   - No Major host / Host -> STOP: "No major hosts or hosts registered (other EPPO host classes are not used)."
-3. `classify_hosts()`: per host, walk taxonomy lineage.
-   - Pinopsida -> `conifer`
-   - Pinales / Coniferales also -> `conifer`; any other plant (kingdom Plantae) -> `non_conifer`
-   - Else -> `other` (ignored)
-   Cached permanently per host code.
-4. `host_to_groups(host_code)` returns a set of commodity groups. v1: from lineage.
-   Union over hosts = groups for the run.
-   - No plant host -> STOP: "No plant hosts among the selected EPPO hosts."
-5. Distribution: countries with status present only. Absent/eradicated/transient excluded.
-   - None -> STOP: "No present-country records in EPPO."
-6. Pest-present countries mapped to SSB names via `country_map.csv`. Used for Class B, marking in table/graph, and the Lovdata search. They do NOT restrict the SSB query.
-7. SSB: CN8 lines for the groups, ALL origin countries, x years.
-   - Years: fixed 10 years back from the latest complete year (`ssb_years: 10`), for table and graph.
-   - Per group, annual quantity summed over (A) all origins and (B) pest-present origins.
-   - Class A and Class B from `finnprio_thresholds.csv`.
-   - Statistic from config (`volume_n: 5`, `volume_stat: mean`) within the 10 years. Panel 1 also shows latest year and max for both A and B. Flag when statistics land in different classes.
-   - kg and pc are never summed. A group with both units is classified per unit and both are shown.
-   - Unit not kg or pc -> STOP: "Unit mismatch for {group}: SSB {x}, expected kg or pc."
-   - No thresholds for a unit -> "not classified", warning in UI.
-   - No imports -> `none recorded` (not `non_existent`). User decides.
-   - UI note: "Class assumes plants for planting pathway. Set manually to Non-existent for hitchhiking, natural spread or intentional introduction."
+1. Validate code: `/taxon/{code}` must exist and be a pest. Else STOP: "Unknown or non-pest EPPO code."
+2. Hosts: `/taxon/{code}/hosts`, keep status `main` + `minor` (fixed in config, no UI toggle). Stops for no hosts / no major or host.
+3. `classify_hosts()`: Pinopsida (or Pinales / Coniferales) -> `conifer`; any other plant -> `non_conifer`; else `other` (ignored). Cached permanently per host code.
+4. `host_to_groups(host_code)`: union over hosts = groups for the run. No plant host -> STOP.
+5. Distribution: countries with status present only. None -> STOP.
+6. Pest-present countries are used for Class B, marking in table/graph and the Lovdata search. They do NOT restrict the SSB query.
+7. SSB: CN8 lines for the groups, ALL origin countries, 10 years; Class A and B from the thresholds; statistic from config; kg and pc never summed; unit check; no imports -> `none recorded`.
 8. Lovdata: search pest name + EPPO synonyms, host genera, pest-present countries.
-9. LLM receives labelled EPPO, SSB (with Class A, Class B, numbers), LAW blocks and produces the write-up.
+9. LLM receives labelled EPPO, SSB and LAW blocks and produces the write-up.
 
 Stops are typed conditions (`stop_app("no_hosts")`) caught in the server and shown as one alert replacing all panels. Nothing downstream renders, no LLM call.
 
 ## Steps
-1. **Scaffold**: renv, testthat, config.yml, `cache.R` (key = hash of query, value + timestamp, TTL per source, taxonomy permanent), `conditions.R`.
-2. **Lookup tables**: `commodity_cn8.csv` built by `dev/build_commodity_cn8.R` (groups `conifer`/`non_conifer`/`both`, source per line). Build `country_map.csv`. Thresholds file as above. UI shows "mapping reviewed [date]".
-3. **EPPO** (`api_eppo.R`): names2codes, taxon, hosts, taxonomy, distribution, categorization. First verify endpoints, rate limits and that taxonomy returns class/order against current docs. Tidy tibbles.
-4. **classify_hosts() + host_to_groups()**: as in Flow. Handle genus/family-level host codes via lineage. Fallback: small family-level lookup (Pinaceae, Cupressaceae, Taxaceae, etc.) if taxonomy lacks higher ranks.
-5. **Lovdata** (`law_index.R`): download current regulations XML (FOR-2000-12-01-1333 + annexes). Split into paragraphs/annex rows. Local keyword index. Return paragraph id, text, source URL, fetch date.
-6. **SSB** (`api_ssb.R`): confirm the table reports CN8 by country, and quantity in kg or pc, first. Chunk queries, cache per country x CN8. Handle CN8 revisions via valid_from/valid_to, show year range. Output per year: quantity, value, unit, origin, pest-present flag. Separate series per group.
-7. **Volume class** (`volume_class.R`): pure function `classify_volume(df, group, unit, stat, years, subset = c("all", "pest_present"))`, no API calls. Aggregates across countries before classifying. Mixed `both` CN8 lines counted once per group, never double-counted.
-8. **UI** (`mod_*.R`): one text input for EPPO code (optional names2codes helper) + Run. Slim header strip: pest name, EPPO code, commodity groups, number of present countries, fetch dates. Four panels:
-   - **Panel 1, SSB table summary:** per group and unit: Class A (official ENT3) and Class B (informational) as badges, each with number, statistic, year range, threshold version; latest year and max; flag if A and B or statistics disagree. Per top origin: quantity, value, pest-present marker. Downloadable as CSV.
-   - **Panel 2, SSB graph:** 10 years, ggplot2 + viridis, one facet per commodity group, top N origins, rest as "Other", pest-present origins marked. Downloadable as PNG.
-   - **Panel 3, Lovdata:** matching snippets with paragraph id, source URL, fetch date. Each snippet has its own copy button.
-   - **Panel 4, FinnPRIO write-up:** editable plain-text box, generated-by-LLM label, one "Copy" button (`rclipboard` or small JS), Regenerate button. No markdown, no tables, so it pastes cleanly into the FinnPRIO form.
-   - EPPO hosts and distribution go in the header strip, a collapsed "Derived inputs" expander (host table, present countries), and as input to the write-up.
-   - Footer: fetch dates, disclaimers (recorded trade not pest pressure; CN8 upper bound; pathway assumption).
-9. **LLM** (`llm_provider.R`): `ellmer`, config switch `claude` | `hf` (base_url `https://router.huggingface.co/v1`, model string in config). Prompt in `prompts.R` builds the write-up from `data/finnprio_writeup_template.txt`. Plain text only. ENT3 answer = Class A using the exact option names. Mentions Class B in one sentence if it differs. Uses supplied numbers as given (no recompute). Cites Lovdata paragraph ids inline as plain text, states "not found" when absent, ends with a short line listing data sources and fetch dates. Norwegian/English from config. Cache per input + model.
-10. **Tests** (mocked API responses):
-    - one per stop condition (invalid code, no hosts, no major/host, no plant hosts, no distribution, unit not kg/pc)
-    - host classification on three known pests (conifer-only, non-conifer-only, mixed)
-    - volume class: exactly 1,000,000 -> medium; exactly 10,000,000 -> medium; 999,999 -> small; 10,000,001 -> large
-    - Class A uses all origins; Class B uses pest-present origins only; A and B differ on a crafted case
-    - mixed-unit group classified separately per unit, kg and pc never summed
-    - missing threshold, no imports (`none recorded`), aggregation across countries, no double-counting of `both` lines
-    - class labels equal FinnPRIO option names
-    - country mapping, cache TTL, CN8 filtering by group
-    - law search on 3 known cases
-    - write-up contains no markdown characters
-    - every cited paragraph id exists in panel 3
-    - ENT3 class in the write-up equals Panel 1 Class A
-    - copy output equals the text box content
-11. **Eval**: 5-10 known cases across Claude and 2-3 HF models, outputs side by side for manual scoring (citation accuracy, hallucination, Norwegian quality).
-12. **Deploy**: second laptop, `shiny::runApp(host = "0.0.0.0", port = 3838)`, Cloudflare quick tunnel, sleep disabled. No auth unless sensitive data is added.
+1. **Scaffold**: renv, testthat, config.yml, `cache.R`, `conditions.R`.
+2. **Lookup tables**: `commodity_cn8.csv` built by `dev/build_commodity_cn8.R`, `country_map.csv`, thresholds.
+3. **EPPO** (`api_eppo.R`): verify endpoints, rate limits, taxonomy ranks first. Tidy tibbles.
+4. **classify_hosts() + host_to_groups()**.
+5. **Lovdata** (`law_index.R`): download, split into paragraphs/annex rows, local keyword index.
+6. **SSB** (`api_ssb.R`): confirm CN8 by country and units first; chunk and cache; handle CN8 revisions.
+7. **Volume class** (`volume_class.R`): pure functions, aggregate across countries before classifying, no double counting.
+8. **UI** (`mod_*.R`): input, header strip, four panels, derived inputs expander, footer.
+9. **LLM** (`llm_provider.R`): ellmer, provider switch, plain text, cites Lovdata ids, cached per input + model.
+10. **Tests** (mocked API responses): stops, classification, class boundaries, aggregation, law search, write-up checks.
+11. **Eval**: 5-10 known cases across Claude and 2-3 HF models, side by side for manual scoring. (Not done.)
+12. **Deploy**: second laptop, `shiny::runApp(host = "0.0.0.0", port = 3838)`, Cloudflare quick tunnel. (Replaced by Posit Connect Cloud.)
 
 ## Order of work
 Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after each step. Stop and ask when a table, endpoint, threshold, mapping or form field is ambiguous. Do not guess.
 
 ## v2 (later)
-- Add groups to `commodity_cn8.csv`: `potato_seed`, `potato_ware`, `tomato`, `cut_flowers`, true seeds (unit pc), etc. Keep seed and consumption separate (different regulation).
-- Add explicit rules in `host_to_groups()` (host code -> group).
-- Group-specific threshold rows only if FinnPRIO ever requires them.
+- Add groups to `commodity_cn8.csv`: `potato_seed`, `potato_ware`, `tomato`, `cut_flowers`, true seeds, etc. Keep seed and consumption separate (different regulation).
+- Compute seeds, food_fodder and other_plant_parts from SSB (now manual).
 - Group-specific Lovdata search terms.
 - Optional: Eurostat behind `get_imports(cn8, countries, years)` for EU context.
-
-
-## Documentation
-- User guide: `README.md` (quick start, keys, panels, method, caveats, data sources). Done 2026-10-20.
-- Decisions, dated: `docs/decisions.md`. What the APIs and the regulation turned out to contain: `docs/findings.md`.
-
-# Reference
-
-## Repository
-- GitHub: https://github.com/floedaniel/Pathway (remote `origin` uses HTTPS: `https://github.com/floedaniel/Pathway.git`).
-
-## EPPO Global Database API v2
-- Base URL `https://api.eppo.int/gd/v2`, key in header `X-Api-Key` (env `EPPO_KEY` or `API_kays/EPPO_beta.txt`). Rate limit 2000 requests / 10 s.
-- OpenAPI spec: https://api.eppo.int/gd/v2/eppo_api_gd_v2.yml. v1 (`data.eppo.int/api/rest/1.0`, `?authtoken=`) is legacy.
-- Endpoints used: `taxons/taxon/{code}/overview`, `/hosts`, `/taxonomy`, `/distribution`, `/names`; `references/distributionStatus`; `tools/name2codes`.
-- Not this: https://eppo.cloud/api/docs belongs to "Eppo", an unrelated A/B-testing company.
-
-## SSB, table 08801
-- External trade by CN8 commodity and country, 1988 to the latest complete year: https://www.ssb.no/en/statbank/table/08801
-- API: PxWebApi v2, `https://data.ssb.no/api/pxwebapi/v2/tables/08801/data` (open; max 800,000 cells per call, 40 calls/min). The old `api/v0` is legacy.
-- Used: Q1 = kg (every line) and value in NOK. Q2 (pieces, m³) is not used.
-- Chapters: 06 = live plants (0601 bulbs and tubers, 0602 plants for planting); 44 = wood (round wood, sawn wood, chips, firewood, packaging); 94.06.10 = prefabricated wooden buildings.
-- CN8 codes carry a version suffix (`06029098_2016`); the line list is built by `dev/build_commodity_cn8.R`.
-
-## Lovdata, FOR-2000-12-01-1333
-- Forskrift om planter og tiltak mot planteskadegjørere: https://lovdata.no/dokument/SF/forskrift/2000-12-01-1333
-- Source: Lovdata public data (open, updated daily), bulk archive of current central regulations: https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2 (file `sf/sf-20001201-1333.xml`). Service description: https://api.lovdata.no/om-api-tjenesten/
-- Key annexes: vedlegg 1 and 2 (regulated pests, vedlegg 2 with host genera), 3 (origin bans), 4A (import requirements), 5A (certificate requirements; nr. 1 plants, nr. 8 wood scope).
-
-## Customs tariff (Tolletaten)
-- Dataset: https://data.toll.no/no/dataset/tolltariffstruktur (open data, the Norwegian customs tariff structure: section > chapter > heading > subheadings > 8-digit item, with HS6 number and references).
-- JSON used: https://data.toll.no/dataset/6350e783-b989-4c7c-9ec0-de2dcb97363c/resource/68f78255-cbb0-4e75-86b1-3d5928816903/download/tolltariffstruktur.json (version 1.5; copy in `docs/reference/tolltariffstruktur.json`).
-- Used by `dev/build_commodity_cn8.R` for the full wording of each current CN8 line (`tariff_description`). SSB labels are often shortened: 06029021 is "trær og busker ikke nevnt ovenfor; draketre (Dracaena) og palmer (Palmae)", not only the genera SSB lists.
-
-## OpenAI (write-up)
-- Provider and model in `config.yml` (`llm.provider: openai`, `llm.model: gpt-5.5-2026-04-23`). Key: env `OPENAI_API_KEY` or `API_kays/tore_vkm_openai.txt`.
-
-# Q & A
-
-Did we not agree that the front page/start page should only take one input, i.e EPOO code or species name?
-then the app should fetch pathway from EPP GD and fetch correct data from ssb? 
-ege if one writes Agrilus anxius - app fatches https://gd.eppo.int/taxon/AGRLAX/pathwayshosts see below. and maps pathwayshosts  to finnprio patways, then fatches correct/relevant ssb data? 
-
-in eppo global database: In the database, the following categories are available (some cannot be searched for, as they are not attached to a specific plant species, e.g. agricultural machinery):
-• Agricultural machinery
-• All commodities
-• Bark
-• Bulbs or tubers
-• Cut flowers or branches
-• Fruits or vegetables
-• Manufactured articles
-• Non-squared wood
-• Packaging material
-• Plants for planting
-• Plant waste
-• Pollen
-• Seeds
-• Soil/growing medium
-• Squared wood
-• Stored products
-
-see: "C:\Users\dafl\Downloads\general_user-guide.pdf" (store in project for ref)
-
-Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
-
-## Open questions for me
-1. **OpenAI model.** Write-ups use `gpt-5.5-2026-04-23` (pinned dated release; the key also offers newer gpt-6 variants). Keep it, or pick another in `config.yml` (`llm.model`)?
-2. **Step 11 (model comparison).** The plan compared Claude and 2-3 Hugging Face models. With OpenAI chosen, still wanted, or skip?
-3. **Step 12 (deploy on the second laptop with a Cloudflare tunnel).** Go ahead when you are ready, or later?
-5. **Host search hits outside the scope.** Searching 08801 for the host (e.g. bjørk) also finds birch veneer sheets (4408) and plywood with a birch face (4412); for conifers also profiled wood (4409) and plywood. They are listed in Panel 1 as 'not counted' (outside Vedlegg 5A nr. 8). Should any of them count, e.g. for EPPO's 'manufactured articles'?
+- Optional: Mattilsynet genus-level import data.

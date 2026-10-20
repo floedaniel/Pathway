@@ -10,8 +10,8 @@
 fmt_num <- function(x) ifelse(is.na(x), "-", format(round(x), big.mark = " ", scientific = FALSE, trim = TRUE))
 fmt_pct <- function(x) ifelse(is.na(x), "-", ifelse(x > 0 & x < 0.01, "<1 %", paste0(round(100 * x), " %")))
 
-group_label <- c(all_hosts = "All host commodities (ENT3)", conifer = "Conifer (info)",
-                 non_conifer = "Non-conifer (info)")
+group_label <- c(all_hosts = "All customs codes below (ENT3 answer)", conifer = "Of which codes for conifer hosts (information)",
+                 non_conifer = "Of which codes for non-conifer hosts (information)")
 
 class_badge <- function(label, official = TRUE) {
   colour <- switch(label, small = "success", medium = "warning", large = "danger", "secondary")
@@ -99,7 +99,7 @@ line_summary <- function(imports, lines, stat_years, total_kg) {
     l <- lines[i, ]
     q <- annual_totals(imports, l, stat_years)$quantity
     tibble::tibble(cn8 = l$cn8, code = cn8_code(l$cn8), description = cn8_text(l), flags = l$flags,
-                   kg = stats::median(q), kg_total = sum(q))
+                   genus = l$genus %||% NA_character_, kg = stats::median(q), kg_total = sum(q))
   })
   out <- dplyr::bind_rows(rows)
   if (nrow(out) == 0) return(out)
@@ -184,6 +184,23 @@ pathway_basis <- function(pathway, r) {
   }
 }
 
+# Origin countries in words, for headings: their names (up to 5) or their number.
+origins_text <- function(r) {
+  o <- origin_countries(r)
+  if (length(o) <= 5) paste(sort(country_name(o, r$country_names)), collapse = ", ")
+  else paste0("the ", length(o), " countries where the pest is present")
+}
+
+# Does a customs code cover only the host? Yes when the code names a host genus
+# (column `genus`, e.g. sawn birch); otherwise it also covers other species
+# (pallets, broadleaved firewood, all trees and shrubs ...). Bark status is added.
+host_only_text <- function(genus, flags) {
+  g <- !is.na(genus) & nzchar(genus %||% "")
+  out <- ifelse(g, paste0("Yes (", gsub(";", ", ", genus), ")"), "No, also other species")
+  extra <- ifelse(grepl("with_bark", flags %||% ""), ", with bark", ifelse(grepl("debarked", flags %||% ""), ", debarked", ""))
+  paste0(out, extra)
+}
+
 simple_table <- function(header, rows, right = integer()) {
   th <- lapply(seq_along(header), function(j) shiny::tags$th(class = if (j %in% right) "text-end", header[j]))
   shiny::tags$table(class = "table table-sm align-middle",
@@ -192,12 +209,13 @@ simple_table <- function(header, rows, right = integer()) {
       shiny::tags$td(class = if (j %in% right) "text-end", cells[[j]]))))))
 }
 
-class_rows_ui <- function(cl) {
+class_rows_ui <- function(cl, r) {
   cl <- cl[order(match(cl$group, names(group_label))), ]
   if (sum(cl$role == "info") < 2) cl <- cl[cl$role == "ent3", ]  # one group: info row would repeat ENT3
   rows <- lapply(seq_len(nrow(cl)), function(i) list(
     group_label[[cl$group[i]]], fmt_num(cl$kg[i]), class_badge(cl$class[i], official = cl$role[i] == "ent3")))
-  simple_table(c("Host commodities", paste0(cl$stat[1], " kg/year from pest-present countries, ", cl$years[1]), "ENT3 class"),
+  simple_table(c("What is counted", paste0("kg imported per year from ", origins_text(r), " (", cl$stat[1], " ", cl$years[1], ")"),
+                 "ENT3 class"),
                rows, right = 2)
 }
 
@@ -206,15 +224,15 @@ present_ui <- function(r, lines, stat_years, total_kg) {
   with_imp <- po[po$kg > 0, ]
   without <- po[po$kg == 0, ]
   shiny::tagList(
-    shiny::h6(class = "mt-3", paste0("Imports by country where the pest is present (median kg/year ",
-                                     min(stat_years), "-", max(stat_years), ")")),
+    shiny::h6(class = "mt-3", paste0("Where the imports come from (", min(stat_years), "-", max(stat_years), ")")),
     shiny::p(class = "small text-muted mb-1", paste0(
-      "Recorded imports from ", nrow(with_imp), " of the ", nrow(po), " countries where the pest is present",
-      if ("NO" %in% r$present_countries) " (Norway, where the pest is also present, is not an origin)", ". ",
+      "Imports per year from each country where the pest is present. ",
+      nrow(with_imp), " of the ", nrow(po), " countries had recorded imports",
+      if ("NO" %in% r$present_countries) " (Norway, where the pest is also present, is not counted as a source)", ". ",
       "Imports from other countries are not used.")),
     if (nrow(with_imp) > 0) simple_table(
-      c("Country", "ISO", "kg/year", "Share", "NOK/year",
-        paste0("Years with imports (of ", length(stat_years), ")"), "Main CN8 code", "Main CN8 description"),
+      c("Country", "ISO", "kg per year (median)", "Share of the ENT3 amount", "NOK per year (median)",
+        paste0("Years with imports (of ", length(stat_years), ")"), "Largest customs code", "What it covers"),
       lapply(seq_len(nrow(with_imp)), function(i) list(
         with_imp$name[i], with_imp$country[i], fmt_num(with_imp$kg[i]), fmt_pct(with_imp$share[i]),
         fmt_num(with_imp$value_nok[i]), with_imp$years_with_imports[i],
@@ -229,15 +247,29 @@ lines_ui <- function(r, lines, stat_years, total_kg) {
   ls <- line_summary(r$imports, lines, stat_years, total_kg)
   used <- ls[ls$kg_total > 0, ]
   shiny::tagList(
-    if (nrow(used) > 0) simple_table(c("CN8", "Description", "kg/year (median)", "Share of total",
-                                       paste0("kg in total ", min(stat_years), "-", max(stat_years)), "Flags"),
+    if (nrow(used) > 0) simple_table(c("Customs code (CN8)", "What the code covers (customs tariff)", "Only the host?",
+                                       "kg per year (median)", "Share of the ENT3 amount",
+                                       paste0("kg in total ", min(stat_years), "-", max(stat_years))),
       lapply(seq_len(nrow(used)), function(i) list(
-        shiny::tags$code(used$code[i]), used$description[i], fmt_num(used$kg[i]),
-        fmt_pct(used$share[i]), fmt_num(used$kg_total[i]), gsub(";", ", ", used$flags[i]))), right = 3:5),
+        shiny::tags$code(used$code[i]), used$description[i], host_only_text(used$genus[i], used$flags[i]),
+        fmt_num(used$kg[i]), fmt_pct(used$share[i]), fmt_num(used$kg_total[i]))), right = 4:6),
     if (nrow(ls) > nrow(used)) shiny::p(class = "small text-muted", paste0(
-      "No recorded imports on ", nrow(ls) - nrow(used), " further line(s): ",
+      "Also counted, but no recorded imports from these countries: ",
       paste(ls$code[!(ls$cn8 %in% used$cn8)], collapse = ", "), "."))
   )
+}
+
+# Explanation above the customs-code table.
+lines_intro <- function(p, r) {
+  info <- pinfo(r, p)
+  genera <- sort(unique(stats::na.omit(info$hosts$genus)))
+  paste0("The ENT3 amount is the sum of these customs codes. ",
+         if (!is.null(info$categories)) paste0("They are the codes for the commodities EPPO lists for this pest (",
+                                                paste(info$categories, collapse = ", "), ")")
+         else "They are the codes for this pathway",
+         if (length(genera)) paste0(", limited to the host genera (", paste(genera, collapse = ", "), ") where a code names a species"),
+         ". Codes marked 'No, also other species' cover more than the host (e.g. pallets of any wood), so the amount is an upper bound. ",
+         "A median of 0 means imports in fewer than half of the years; the total shows them.")
 }
 
 bark_subtotal <- function(imports, lines, stat_years) {
@@ -264,14 +296,16 @@ pathway_block_ui <- function(p, r, cn8_table, settings) {
   total <- cl$kg[cl$role == "ent3"]
   bark <- if (p == "wood") bark_subtotal(r$imports, lines, stat_years) else NA
   shiny::tagList(
-    head, shiny::p(class = "small text-muted", pathway_basis(p, r)), class_rows_ui(cl),
+    head, shiny::p(class = "small text-muted", pathway_basis(p, r)), class_rows_ui(cl, r),
     present_ui(r, lines, stat_years, total),
-    shiny::tags$details(open = NA, shiny::tags$summary(paste0("CN8 lines in this pathway (median kg/year ",
-                                                               min(stat_years), "-", max(stat_years), ")")),
-                        lines_ui(r, lines, stat_years, total)),
+    shiny::tags$details(open = NA,
+      shiny::tags$summary(class = "h6", paste0("What is imported: the customs codes counted for ", tolower(pathway_label(p)),
+                                               " (", min(stat_years), "-", max(stat_years), ")")),
+      shiny::p(class = "small text-muted mb-1", lines_intro(p, r)),
+      lines_ui(r, lines, stat_years, total)),
     shiny::div(class = "alert alert-warning py-2", lapply(pathway_notes(p, r), shiny::p, class = "mb-1")),
     if (!is.na(bark)) shiny::p(class = "small text-muted",
-      paste0("Information only: round wood with bark, median ", fmt_num(bark), " kg/year (not ENT3)."))
+      paste0("Of which round wood with bark: ", fmt_num(bark), " kg per year (median; information only)."))
   )
 }
 
@@ -280,13 +314,13 @@ host_search_ui <- function(r) {
   h <- r$host_search
   if (is.null(h)) return(NULL)
   shiny::tagList(
-    shiny::h5(class = "mt-4", "Host search in SSB table 08801"),
+    shiny::h5(class = "mt-4", paste0("Where the host is named in the import statistics (",
+                                     paste(unique(paste0(h$host, " = ", h$term)), collapse = ", "), ")")),
     shiny::p(class = "small text-muted", paste0(
-      "Every 08801 line (valid in the table window) whose label names a host genus, by Latin or Norwegian name (",
-      paste(unique(paste0(h$host, " = ", h$term)), collapse = ", "),
-      "). Only lines marked 'counted' are part of the ENT3 numbers above.")),
-    if (nrow(h) == 0) shiny::p("No 08801 label names the host genera.") else simple_table(
-      c("CN8 code", "Valid", "SSB label", "Host", "Matched term", "Status"),
+      "Every customs code in SSB table 08801 whose name mentions a host genus, by Latin or Norwegian name. ",
+      "Codes marked 'counted' are part of the ENT3 amount above; for the others the reason is given.")),
+    if (nrow(h) == 0) shiny::p("No customs code in SSB table 08801 names the host genera.") else simple_table(
+      c("Customs code (CN8)", "Valid years", "Name in SSB", "Host", "Matched word", "Counted?"),
       lapply(seq_len(nrow(h)), function(i) list(shiny::tags$code(h$code[i]), h$valid[i], h$label[i], h$host[i], h$term[i],
         if (startsWith(h$status[i], "counted")) shiny::span(class = "text-success", h$status[i]) else h$status[i]))))
 }

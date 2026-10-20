@@ -30,7 +30,7 @@ Working agreements (from the user):
 ## Status
 
 - **App:** complete for v1. Single input, four panels, LLM write-up. All 318 test pests run through the pipeline without R errors (final debugging pass, decision 45).
-- **Tests:** 238 offline tests pass (`testthat::test_dir("tests/testthat")`).
+- **Tests:** all offline tests pass (253 expectations) (`testthat::test_dir("tests/testthat")`).
 - **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `a11a7bf`. **Not yet deployed:** the pest-present-only change (decision 52); redeploy with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
@@ -63,14 +63,14 @@ Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant comm
 **Screen:**
 
 - **Header strip:** pest and code, where pathways come from (EPPO host commodities with count, or host plants with the reason), host counts (conifer / non-conifer / not plants), "SSB imports only from the N countries where the pest is present" (plus "also present in Norway" when so), years.
-- **Panel 1, SSB table:** per pathway one block, all numbers from pest-present countries only.
-  - Class rows: `All host commodities (ENT3)` = median kg/year from pest-present countries and the class; columns: host commodities | median kg/year from pest-present countries | ENT3 class. Conifer / non-conifer group rows only when both groups exist (information).
-  - "Imports by country where the pest is present": Country | ISO | kg/year | Share | NOK/year | Years with imports (of N) | Main CN8 code | Main CN8 description; countries without imports listed below.
-  - "CN8 lines in this pathway": code, tariff description, median kg/year, share, kg in total over the 10 years (sparse lines have median 0), flags.
+- **Panel 1, SSB table:** per pathway one block, all numbers from pest-present countries only. Headings in plain words (user: "nobody will understand 'CN8 lines in this pathway'"), each with one explanatory sentence.
+  - Class table: What is counted | kg imported per year from <country names, or "the N countries where the pest is present"> (median 2016-2025) | ENT3 class. Rows "All customs codes below (ENT3 answer)", and "Of which codes for conifer / non-conifer hosts (information)" only when both groups exist.
+  - "Where the imports come from (2016-2025)": Country | ISO | kg per year (median) | Share of the ENT3 amount | NOK per year (median) | Years with imports (of N) | Largest customs code | What it covers; countries without imports listed below.
+  - "What is imported: the customs codes counted for <pathway> (2016-2025)", with an explanation (EPPO categories, host genera, upper bound, median 0): Customs code (CN8) | What the code covers (customs tariff) | Only the host? | kg per year (median) | Share of the ENT3 amount | kg in total 2016-2025. "Only the host?" = "Yes (<genus>)" when the code names a host genus, else "No, also other species" (+ ", with bark"/", debarked"). Codes without imports: "Also counted, but no recorded imports from these countries: ...".
   - Notes on the basis (EPPO list or fallback) and upper bounds.
   - Wood: with-bark subtotal (information).
   - Removed with decision 52: "Top origins (all countries)", the pest-present kg/share columns.
-  - "Host search in SSB table 08801": CN8 code | Valid | SSB label | Host | Matched term | Status.
+  - "Where the host is named in the import statistics (<genus> = <Norwegian name>)": Customs code (CN8) | Valid years | Name in SSB | Host | Matched word | Counted?.
 - **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom. Only pest-present countries. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Caption explains the bars. (The all/pest-present switch was removed with decision 52.) PNG download. No "*" marker (removed on request).
 - **Panel 3, Lovdata:** snippets with id (e.g. "Vedlegg 2, nr. 10"), link, copy button.
 - **Panel 4, FinnPRIO write-up:** per computed pathway an editable text box, Copy, Regenerate, labelled with its source (model or fallback).
@@ -159,6 +159,7 @@ Note: <pathway notes>
 - The LLM (OpenAI, `gpt-5.5-2026-04-23`) writes only the Regulation lines: one sentence per unit, each must start with a Panel 3 id (`validate_regulation()`); otherwise the unit text is shown (`regulation_fallback()`). Cached per units + model; Regenerate bypasses the cache.
 - Units: those naming the pest, then origin rules, in regulation order.
 - No imports at all: "ENT3: none recorded" and "...: no recorded imports (2016-2025)".
+- "mixed line" = flagged upper_bound AND not naming a host genus (`mixed_line(flags, genus)`); a birch-only code is never called mixed.
 
 ## Code map
 
@@ -260,6 +261,7 @@ Note: <pathway notes>
 9. Posit Connect Cloud: manifest, deploy script, published.
 10. Notes rewritten as project memory; README, vignette (`docs/vignette.md`), decisions 49-51 and findings updated. `old_scripts/` deleted.
 11. Decision 52: imports only from countries where the pest is present (Norway excluded); Panel 1, graph and write-up reworked; docs updated.
+12. Decision 53: plain-language headings and columns in Panel 1; "Only the host?" column replaces the flags column; genus-specific codes no longer called "mixed line".
 
 Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; effectively replaced by Connect Cloud). See Open questions 2 and 3.
 

@@ -126,6 +126,15 @@ test_that("regulation lines are cached per units and model; Regenerate (nonce) b
   expect_equal(n, 2)
 })
 
+test_that("a code that names the host genus is not a mixed line, even if flagged upper_bound", {
+  expect_false(mixed_line("upper_bound", "Betula"))
+  expect_true(mixed_line("upper_bound", NA))
+  expect_false(mixed_line("", NA))
+  expect_equal(host_only_text("Betula", "upper_bound"), "Yes (Betula)")
+  expect_equal(host_only_text("Picea;Abies", "with_bark"), "Yes (Picea, Abies), with bark")
+  expect_equal(host_only_text(NA, "upper_bound"), "No, also other species")
+})
+
 test_that("mass formatting: millions with one decimal, smaller numbers in kg", {
   expect_equal(fmt_mass(19119489), "19.1 million kg")
   expect_equal(fmt_mass(99), "99 kg")

@@ -59,7 +59,9 @@ writeup_inputs <- function(r, pathway, cn8_table = read_commodity_cn8()) {
   )
 }
 
-mixed_line <- function(flags) grepl("upper_bound", flags %||% "")
+# A line that also covers species other than the host: flagged upper_bound and not
+# naming a host genus (a genus-specific line such as sawn birch is not mixed).
+mixed_line <- function(flags, genus = NA) grepl("upper_bound", flags %||% "") & (is.na(genus) | !nzchar(genus))
 
 # Lovdata units the regulation section covers: units naming the pest, then
 # origin rules (host genus + pest-present country).
@@ -105,7 +107,7 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   if (!is.null(top) && nrow(top) > 0) {
     out <- c(out, "Largest CN8 lines (median kg per year, share of total, kg in total):",
              paste0(label_of(top$cn8), "(", top$code, "): ", fmt_mass(top$kg), " per year (", fmt_share(top$share),
-                    ifelse(mixed_line(top$flags), ", mixed line", ""), "), ", fmt_mass(top$kg_total),
+                    ifelse(mixed_line(top$flags, top$genus %||% NA), ", mixed line", ""), "), ", fmt_mass(top$kg_total),
                     " in total ", ent3$years), "")
   }
 

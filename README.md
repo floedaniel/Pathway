@@ -202,7 +202,7 @@ Pathwise_notes.Rmd        project notes and open questions
 ```r
 testthat::test_dir("tests/testthat")
 ```
-238 tests, all offline. EPPO responses and host-commodity pages are recorded in `tests/testthat/fixtures/`; refresh them with `Rscript dev/record_eppo_fixtures.R`. Lovdata is a stored copy of the regulation, and the LLM is faked.
+All tests run offline (253 checks). EPPO responses and host-commodity pages are recorded in `tests/testthat/fixtures/`; refresh them with `Rscript dev/record_eppo_fixtures.R`. Lovdata is a stored copy of the regulation, and the LLM is faked.
 
 ## Deployment
 The app runs on Posit Connect Cloud (account `danielflow`):

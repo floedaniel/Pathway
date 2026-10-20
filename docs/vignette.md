@@ -64,38 +64,55 @@ Each pathway takes the CN8 lines of its EPPO categories from `data/commodity_cn8
 
 The genus filter matters. Before it existed, about 90 % of the non-conifer wood imported from Canada and the USA was oak. With the filter, those imports fell from 5.3 million kg to under 50 t per year, mostly pallets.
 
-## 6. ENT3 classes (Panel 1)
+## 6. Panel 1: summary and one card per pathway
 
-For each pathway, the app sums the kg over Canada and the USA per year, then takes the median over 2016-2025:
+For each pathway, the app sums the kg from Canada and the USA per year, then takes the median over 2016-2025. Panel 1 opens with a **summary**, one row per pathway:
 
-| Pathway | Median kg/year from CA + US | ENT3 |
-|---|---|---|
-| Plants for planting | 949 | **small** |
-| Wood | 49 145 | **small** |
+| Pathway | Based on | kg per year (median 2016-2025) | ENT3 class | Largest source country | Largest customs code |
+|---|---|---|---|---|---|
+| Plants for planting | EPPO host commodities: plants for planting of Betula | 949 | **small** | United States of America | 06029021 trees and shrubs with soil n.e.s. |
+| Wood | EPPO host commodities: squared wood, non-squared wood, bark, manufactured articles, packaging material of Betula | 49 144 | **small** | United States of America | 44152000 pallets |
 
-Both are `small` (under 1 million kg).
+Both are `small` (under 1 million kg). The pathways are assessed separately, so their amounts are not added up.
 
-The country table shows where the volume comes from:
+Below the summary, each pathway has its own numbered card ("1. Plants for planting", "2. Wood") with the ENT3 answer in its header. Every card has the same two tables, **By country** and **By customs code**, with the same number columns:
 
-| Pathway | Country | kg/year | Main CN8 line |
-|---|---|---|---|
-| Plants for planting | United States | 946 | 06029021 trees and shrubs with soil n.e.s. |
-| Plants for planting | Canada | 0 (imports in 1 of 10 years) | 06029021 |
-| Wood | United States | 44 932 | 44152000 pallets |
-| Wood | Canada | 2 302 | 44079900 sawn broadleaved wood, not oak, beech, conifers or tropical |
+* kg per year (median)
+* kg in total 2016-2025
+* share of total
+* NOK in total
+* years with imports
 
-The *CN8 lines in this pathway* table gives each line's median, its share of the total, and its total over the ten years. The totals matter because many small flows have a median of 0:
+Both tables end in a **Total** row. The shares are of the 10-year total, so they add up to 100 %. The total per year is the ENT3 amount: the median of the yearly totals, which is not the sum of the row medians.
 
-* **Plants for planting:** 06029021 accounts for 766 kg/year (81 %), or 7 998 kg in total. The other lines have a median of 0 but some imports: cuttings 06021029 (924 kg in total), green pot plants 06029023 (749 kg) and 06029039 (581 kg).
-* **Wood:**
-  * Pallets 44152000: 32 526 kg/year (66 %), 327 671 kg in total.
-  * Crates 44151000: 14 060 kg/year (29 %), 130 249 kg in total.
-  * Broadleaved chips 44012200: 400 kg/year.
-  * Sawn broadleaved wood 44079900 (156 887 kg in total) and prefabricated wooden buildings 94061090 (53 569 kg in total) came in a few years only, so their median is 0.
+**2. Wood, by country**
 
-All of these are mixed lines: they cover the host but much else besides, so even the small numbers are upper bounds for birch.
+| Country | ISO | kg per year (median) | kg in total 2016-2025 | Share of total | NOK in total | Years with imports (of 10) | Largest customs code |
+|---|---|---|---|---|---|---|---|
+| United States of America | US | 44 932 | 480 132 | 70 % | 21 826 860 | 10 | 44152000 |
+| Canada | CA | 2 302 | 207 881 | 30 % | 6 527 671 | 10 | 44079900 |
+| **Total** | | **49 144\*** | **688 013** | **100 %** | **28 354 531** | **10** | |
 
-## 7. Host search in SSB (Panel 1)
+**2. Wood, by customs code** (largest of 18 codes with imports)
+
+| Customs code | What the code covers | Only the host? | kg per year (median) | kg in total 2016-2025 | Share of total | Years with imports (of 10) |
+|---|---|---|---|---|---|---|
+| 44152000 | pallets | No, also other species | 32 526 | 327 671 | 48 % | 10 |
+| 44079900 | sawn wood, not conifers, oak, beech or tropical (version valid to 2016, before birch had its own code) | No, also other species | 0 | 156 887 | 23 % | 1 |
+| 44151000 | cases, boxes, crates, cable drums | No, also other species | 14 060 | 130 249 | 19 % | 10 |
+| 94061090 | prefabricated wooden buildings, other | No, also other species | 0 | 53 569 | 8 % | 4 |
+| 44012200 | broadleaved chips | No, also other species | 400 | 14 152 | 2 % | 10 |
+| ... | | | | | | |
+| 44079600 | sawn birch | **Yes (Betula)** | 0 | 31 | <1 % | 2 |
+| **Total** | | | **49 144\*** | **688 013** | **100 %** | **10** |
+
+**1. Plants for planting:** the United States supplies >99 % (10 520 of 10 525 kg over ten years); Canada 5 kg in one year. The largest code is 06029021, trees and shrubs with soil not elsewhere specified (7 998 kg in total, 76 %). It is followed by cuttings 06021029 (9 %) and green pot plants 06029023 (7 %) and 06029039 (6 %).
+
+The total column matters. Many small flows have a median of 0 because they came in fewer than half of the years. Sawn broadleaved wood is the second-largest wood code by total but came in a single year.
+
+Every code with imports is marked "No, also other species", except sawn birch (31 kg in ten years). So even these small amounts are upper bounds for birch.
+
+## 7. Where the host is named in the import statistics (Panel 1, last card)
 
 Every 08801 label valid in 2016-2025 is searched for *Betula* and its Norwegian name *bjørk*. Whole words only, and exclusion clauses such as "unntatt bjørk" are recognised:
 

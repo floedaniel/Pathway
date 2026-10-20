@@ -44,8 +44,8 @@ pathway_scope <- function(pathway, lines) {
   }
 }
 
-# Deterministic inputs for one pathway: CN8 line summary, the country table (every
-# pest-present country) and imports per country and line.
+# Deterministic inputs for one pathway: CN8 line summary, every pest-present country
+# (with or without imports) and imports per country and line.
 writeup_inputs <- function(r, pathway, cn8_table = read_commodity_cn8()) {
   ent3 <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3", ]
   lines <- pathway_lines(cn8_table, pathway, pinfo(r, pathway))

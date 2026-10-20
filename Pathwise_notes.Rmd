@@ -31,7 +31,7 @@ Working agreements (from the user):
 
 - **App:** complete for v1. Single input, four panels, LLM write-up. All 318 test pests run through the pipeline without R errors (final debugging pass, decision 45).
 - **Tests:** 233 offline tests pass (`testthat::test_dir("tests/testthat")`).
-- **Git:** https://github.com/floedaniel/Pathway, branch `main`, 26 commits, last `a11a7bf` (deploy script). Tree in sync with origin.
+- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `a11a7bf` (later commits change only documentation).
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
   - Dashboard: https://connect.posit.cloud/danielflow/content/01a158ac-9fd3-b5d5-8776-1d40f1995348
@@ -181,7 +181,13 @@ Note: <pathway notes>
 
 **Data files:** `commodity_cn8.csv`, `eppo_commodity_map.csv` (16 categories), `finnprio_thresholds.csv`, `country_map.csv` (only SSB exceptions CS_, XI, 97; other Land codes are ISO2), `law_taxon_aliases.csv`, `genus_names_no.csv`, `data/law/` (downloaded archive, git-ignored).
 
-**Docs:** `README.md` (user guide; partly out of date, see Open questions), `docs/decisions.md` (decisions 1-48), `docs/findings.md`, `docs/reference/eppo_gd_general_user-guide.pdf`, `docs/reference/tolltariffstruktur.json`.
+**Docs** (all updated 2026-10-20 to match this file):
+
+- `README.md`: user guide (quick start, keys, panels, method, caveats, sources, deployment).
+- `docs/vignette.md`: worked example, AGRLAX step by step, real numbers from a run on 2026-10-20. Markdown, not R Markdown, because rmarkdown is not in the project library. Re-run and update the numbers if the method changes.
+- `docs/decisions.md`: decisions 1-51 (49 front page and graph, 50 deployment, 51 documentation).
+- `docs/findings.md`.
+- Reference copies: `docs/reference/eppo_gd_general_user-guide.pdf`, `docs/reference/tolltariffstruktur.json`.
 
 ## Configuration and keys
 
@@ -229,7 +235,8 @@ Note: <pathway notes>
 
 ## Results worth remembering
 
-- **AGRLAX (*Agrilus anxius*):** hosts all *Betula*, present in CA and US. EPPO list: plants for planting, squared and non-squared wood, bark, manufactured articles, packaging, all *Betula*. Before the genus filter 90 % of "non-conifer wood from pest-present countries" was oak; with it ~47 t/year (mostly pallets) instead of 5.3 million kg. Lovdata: Vedlegg 1 nr. 2.1 (pest), Vedlegg 4A nr. 45, origin rule Vedlegg 3 nr. 11 (*Betula* from Canada and USA).
+- **AGRLAX (*Agrilus anxius*), run 2026-10-20 (full walk-through in `docs/vignette.md`):** plants for planting 35.3 million kg/year (large), 949 kg from CA/US; wood 291.9 million kg/year (large), 49 t from CA/US. 17 Lovdata units. Only 6 SSB lines are birch-specific.
+- **AGRLAX, earlier:** hosts all *Betula*, present in CA and US. EPPO list: plants for planting, squared and non-squared wood, bark, manufactured articles, packaging, all *Betula*. Before the genus filter 90 % of "non-conifer wood from pest-present countries" was oak; with it ~47 t/year (mostly pallets) instead of 5.3 million kg. Lovdata: Vedlegg 1 nr. 2.1 (pest), Vedlegg 4A nr. 45, origin rule Vedlegg 3 nr. 11 (*Betula* from Canada and USA).
 - **IPSXCA wood:** total 1.26 billion kg; pest-present origins 0.43 million kg.
 - **Sweep of 318 pests:** 215 get pathways from EPPO host commodities, the rest from host plants. XANTPD stops (no hosts in EPPO), which is correct.
 
@@ -244,6 +251,7 @@ Note: <pathway notes>
 7. Pathways from EPPO host commodities; single input; checkboxes removed.
 8. Customs tariff wording (06029021 fix); final debugging pass; host search in SSB; UI clean-ups (footer text, "*" marker, legend with codes).
 9. Posit Connect Cloud: manifest, deploy script, published.
+10. Notes rewritten as project memory; README, vignette (`docs/vignette.md`), decisions 49-51 and findings updated.
 
 Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; effectively replaced by Connect Cloud). See Open questions 2 and 3.
 
@@ -295,7 +303,6 @@ Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`
 5. **Host search hits outside the scope.** Searching 08801 for the host (e.g. bjørk) also finds birch veneer sheets (4408) and plywood with a birch face (4412); for conifers also profiled wood (4409) and plywood. They are listed in Panel 1 as 'not counted' (outside Vedlegg 5A nr. 8). Should any of them count, e.g. for EPPO's 'manufactured articles'?
 6. **`library(config)` in app.R.** It masks `base::get` and `base::merge` and prints a warning at start; the app does not need it. Remove it?
 7. **Access to the online app.** It is public (anyone with the link, using your EPPO and OpenAI keys). Keep it public, restrict it in the Connect Cloud dashboard, or add a password?
-8. **README.** The user guide is partly out of date (says the graph marks pest-present origins with "*", write-up max 200 characters, 0601 only for monocots). Update it to match Part 1?
 
 # Appendix A: Original plan (2026-10-20, superseded where Part 1 or docs/decisions.md differ)
 

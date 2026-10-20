@@ -92,6 +92,36 @@ out <- rbind(plants, wood)
 out$notes <- ""
 out$reviewed <- ""
 
+# ---- seed potatoes, food and fodder, other plant parts, seeds ------------------
+# From data/cn8_host_taxa.csv (decisions 55-56): each code pattern gives the
+# pathway, the host taxa it covers (EPPO preferred names, checked with
+# dev/check_host_taxa.R), residual exclusions, group and flags. Food and fodder:
+# only fresh or chilled products (wording "frisk/fersk/kjølt"; user's decision).
+host_taxa <- utils::read.csv("data/cn8_host_taxa.csv", colClasses = "character", encoding = "UTF-8")
+row_of <- vapply(code, function(cd) {
+  hit <- which(vapply(host_taxa$pattern, function(p) grepl(p, cd), logical(1)))
+  if (length(hit)) hit[1] else NA_integer_
+}, integer(1))
+fresh <- has("frisk|fersk|kjølt")
+take <- !is.na(row_of) & host_taxa$pathway[row_of] != "exclude" &
+  (host_taxa$pathway[row_of] != "food_fodder" | fresh)
+more <- d[take, ]
+ht <- host_taxa[row_of[take], ]
+more$pathway <- ht$pathway
+more$commodity_group <- ht$commodity_group
+more$flags <- ht$flags
+more$source <- paste0("data/cn8_host_taxa.csv: ", ht$norwegian, ifelse(nzchar(ht$note), paste0(" (", ht$note, ")"), ""))
+more$notes <- ""
+more$reviewed <- ""
+more_taxa <- ht$taxa
+more_excl <- ht$excludes
+# "@vegetables" = every taxon named on the fresh-vegetable lines (chapter 07)
+veg <- unique(unlist(strsplit(ht$taxa[startsWith(more$cn8, "07") & ht$pathway == "food_fodder"], ";")))
+more_taxa[more_taxa == "@vegetables"] <- paste(sort(veg[nzchar(veg)]), collapse = ";")
+out <- rbind(out, more)
+dropped <- d[!is.na(row_of) & !take & host_taxa$pathway[row_of] == "food_fodder", c("cn8", "description")]
+cat("food lines dropped as not fresh or chilled:", nrow(dropped), "\n")
+
 # ---- genus-specific and residual lines (from the SSB wording) ----------------
 # `genus`: the line covers only these genera; it counts only when a host belongs
 # to one of them. `excludes_genera`: residual line ("other ..." / "unnt ...");
@@ -126,6 +156,12 @@ apply_rules <- function(rules) {
 }
 out$genus <- apply_rules(genus_rules)
 out$excludes_genera <- apply_rules(residual_rules)
+new_rows <- out$pathway %in% c("food_fodder", "other_plant_parts", "seeds") | grepl("^070110", out$cn8)
+out$genus[new_rows] <- more_taxa
+out$excludes_genera[new_rows] <- more_excl
+# HS chapter 6 notes: 0601 (bulbs, tubers) does not cover potatoes (0701), so the
+# bulb lines do not count for a potato host
+out$excludes_genera[startsWith(out$cn8, "0601")] <- "Solanum tuberosum"
 
 # ---- EPPO host-commodity categories (data/eppo_commodity_map.csv) -----------
 # A line counts for a pest only when EPPO lists one of its categories for the pest.
@@ -136,10 +172,14 @@ category_rules <- list(
   "^4406|^4407" = "squared wood",
   "^4401(40|41|49)|^4401390[129]_2012" = "bark;plant waste",
   "^4415" = "packaging material",
-  "^4416|^940610" = "manufactured articles"
+  "^4416|^940610" = "manufactured articles",
+  "^070110" = "plants for planting;bulbs or tubers",   # seed potatoes
+  "^070[1-9]|^0714|^080|^0810" = "fruits or vegetables",
+  "^0603|^0604" = "cut flowers or branches",
+  "^10|^1209" = "seeds"
 )
 out$eppo_category <- apply_rules(category_rules)
-stopifnot(all(nzchar(out$eppo_category)))
+if (!all(nzchar(out$eppo_category))) { print(out$cn8[!nzchar(out$eppo_category)]); stop("lines without EPPO category") }
 
 # ---- full wording from the Norwegian customs tariff (Tolletaten, data.toll.no) ---
 # The tariff structure gives each current 8-digit item with its full hierarchy
@@ -200,8 +240,21 @@ gn <- do.call(rbind, lapply(pairs, function(p) {
   words <- strsplit(sub(" \\(.*", "", p), " og ", fixed = TRUE)[[1]]
   data.frame(genus = genus, norwegian = unique(c(words, sub("tre$", "", words[grepl(".{4,}tre$", words)]))))
 }))
-gn <- unique(gn[order(gn$genus, gn$norwegian), ])
 gn$source <- "tolltariffstruktur"
+# crop names from data/cn8_host_taxa.csv (e.g. tomater -> Solanum), by genus;
+# family-level taxa (Orchidaceae, Fabaceae) are left out
+crop <- do.call(rbind, lapply(seq_len(nrow(host_taxa)), function(i) {
+  tx <- strsplit(host_taxa$taxa[i], ";")[[1]]
+  gen <- unique(sub(" .*$", "", gsub("(^|\\s)x\\s", "\\1", tx)))
+  gen <- gen[nzchar(gen) & !grepl("aceae$", gen) & !startsWith(gen, "@")]
+  words <- strsplit(host_taxa$norwegian[i], ";")[[1]]
+  if (!length(gen) || !length(words)) return(NULL)
+  expand.grid(genus = gen, norwegian = words, stringsAsFactors = FALSE)
+}))
+crop$source <- "cn8_host_taxa.csv"
+gn <- rbind(gn, crop)
+gn <- gn[!duplicated(gn[c("genus", "norwegian")]), ]
+gn <- gn[order(gn$genus, gn$norwegian), ]
 write.csv(gn, "data/genus_names_no.csv", row.names = FALSE, fileEncoding = "UTF-8")
 cat("Norwegian genus names:", nrow(gn), "for", length(unique(gn$genus)), "genera\n")
 

@@ -39,3 +39,6 @@ API_keys/
 
 # rsconnect deployment records (contain account/app ids)
 rsconnect/
+
+# Reference copy of Lid's flora (published list; not used by the app, not committed)
+data/Lids_flora.xls

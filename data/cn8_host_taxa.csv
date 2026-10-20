@@ -1,0 +1,155 @@
+pattern,pathway,norwegian,taxa,excludes,commodity_group,flags,note
+^070110,plants_for_planting,settepoteter,Solanum tuberosum,,non_conifer,,Seed potatoes (decision 55)
+^070190,food_fodder,poteter;nypoteter,Solanum tuberosum,,non_conifer,,
+^0702,food_fodder,tomater,Solanum lycopersicum,,non_conifer,,
+^070310,food_fodder,kepaløk;rødløk;sjalottløk,Allium cepa;Allium ascalonicum,,non_conifer,,Shallot is Allium cepa Aggregatum group (also Allium ascalonicum)
+^070320,food_fodder,hvitløk,Allium sativum,,non_conifer,,
+^07039002,food_fodder,vårløk,Allium fistulosum;Allium cepa,,non_conifer,,
+^0703900[34],food_fodder,purre,Allium porrum;Allium ampeloprasum,,non_conifer,,
+^07039005,food_fodder,gressløk,Allium schoenoprasum,,non_conifer,,
+^0703900[89],food_fodder,løkslag,Allium,Allium cepa;Allium ascalonicum;Allium sativum;Allium fistulosum;Allium porrum;Allium ampeloprasum;Allium schoenoprasum,non_conifer,upper_bound,Other Allium
+^070410,food_fodder,blomkål;brokkoli,Brassica oleracea,,non_conifer,,
+^070420,food_fodder,rosenkål,Brassica oleracea,,non_conifer,,
+^07049(01|02|03|04|05),food_fodder,hvitkål;rødkål,Brassica oleracea,,non_conifer,,
+^07049060,food_fodder,kinakål,Brassica rapa,,non_conifer,,
+^0704909[3-6],food_fodder,savoykål;grønnkål,Brassica oleracea,,non_conifer,,
+^0704909[89],food_fodder,kål,Brassica,,non_conifer,upper_bound,Other edible brassicas (incl. kohlrabi)
+^070511,food_fodder,issalat;hodesalat,Lactuca sativa,,non_conifer,,
+^070519,food_fodder,salat,Lactuca sativa,,non_conifer,,
+^070521,food_fodder,sikorisalat;julesalat,Cichorium intybus,,non_conifer,,
+^070529,food_fodder,sikori,Cichorium intybus;Cichorium endivia,,non_conifer,,
+^0706101|^0706102,food_fodder,gulrøtter,Daucus carota,,non_conifer,,
+^07061030,food_fodder,neper,Brassica rapa,,non_conifer,,
+^07069010,food_fodder,knollselleri,Apium graveolens,,non_conifer,,
+^0706902|^0706903,food_fodder,redikker,Raphanus sativus,,non_conifer,,
+^07069040,food_fodder,rødbeter,Beta vulgaris,,non_conifer,,
+^07069099,food_fodder,røtter,,*,non_conifer,upper_bound,Edible roots n.e.s.: counts for hosts without their own line
+^0707,food_fodder,agurker;slangeagurker,Cucumis sativus,,non_conifer,,
+^070810,food_fodder,erter,Pisum sativum,,non_conifer,,
+^070820,food_fodder,bønner,Phaseolus;Vigna,,non_conifer,,HS 0708 20: beans of Vigna and Phaseolus
+^070890,food_fodder,belgfrukter,Fabaceae,Pisum;Phaseolus;Vigna,non_conifer,upper_bound,Other leguminous vegetables
+^070920,food_fodder,asparges,Asparagus officinalis,,non_conifer,,
+^070930,food_fodder,auberginer,Solanum melongena,,non_conifer,,
+^070940,food_fodder,selleri,Apium graveolens,,non_conifer,,
+^07095,exclude,sopper,,,,,Mushrooms are not plants
+^0709601|^0709602,food_fodder,pepperfrukter,Capsicum annuum,,non_conifer,,Sweet peppers
+^07096090,food_fodder,pepperfrukter,Capsicum;Pimenta,,non_conifer,,
+^070970,food_fodder,spinat;hagemelde,Spinacia oleracea;Tetragonia tetragonoides;Atriplex hortensis,,non_conifer,,
+^070991,food_fodder,artiskokker,Cynara,,non_conifer,,
+^070992,food_fodder,oliven,Olea europaea,,non_conifer,,
+^07099301,food_fodder,squash,Cucurbita pepo,,non_conifer,,
+^07099309,food_fodder,gresskar,Cucurbita,,non_conifer,,
+^07099910,food_fodder,kapers,Capparis spinosa,,non_conifer,,
+^07099920,food_fodder,kruspersille;persille,Petroselinum crispum,,non_conifer,,
+^0709993|^0709994,food_fodder,sukkermais,Zea mays,,non_conifer,,
+^07099990,food_fodder,grønnsaker,,*,non_conifer,upper_bound,Vegetables n.e.s.: counts for hosts without their own line
+^071410,food_fodder,maniokarot;kassava,Manihot esculenta,,non_conifer,fresh_or_dried,
+^071420,food_fodder,søtpoteter,Ipomoea batatas,,non_conifer,fresh_or_dried,
+^071430,food_fodder,jamsrøtter,Dioscorea,,non_conifer,fresh_or_dried,
+^071440,food_fodder,taroer,Colocasia,,non_conifer,fresh_or_dried,
+^071450,food_fodder,yautia,Xanthosoma,,non_conifer,fresh_or_dried,
+^071490,food_fodder,arrowrot;jordskokker,,*,non_conifer,upper_bound;fresh_or_dried,Starchy roots n.e.s.
+^08011[29],food_fodder,kokosnøtter,Cocos nucifera,,non_conifer,fresh_or_dried,
+^08012,food_fodder,paranøtter,Bertholletia excelsa,,non_conifer,fresh_or_dried,
+^08013,food_fodder,akajounøtter,Anacardium occidentale,,non_conifer,fresh_or_dried,
+^08021,food_fodder,mandler,Prunus dulcis,,non_conifer,fresh_or_dried,
+^08022,food_fodder,hasselnøtter,Corylus,,non_conifer,fresh_or_dried,
+^08023,food_fodder,valnøtter,Juglans,,non_conifer,fresh_or_dried,
+^08024,food_fodder,kastanjer,Castanea,,non_conifer,fresh_or_dried,
+^08025,food_fodder,pistasjenøtter,Pistacia vera,,non_conifer,fresh_or_dried,
+^08026,food_fodder,makadamianøtter,Macadamia,,non_conifer,fresh_or_dried,
+^08027,food_fodder,kolanøtter,Cola,,non_conifer,fresh_or_dried,
+^08028,food_fodder,betelnøtter;arekanøtter,Areca catechu,,non_conifer,fresh_or_dried,
+^08029010|^08029910,food_fodder,pekannøtter,Carya illinoinensis,,non_conifer,fresh_or_dried,
+^08029091|^0802910|^0802920,food_fodder,pinjekjerner,Pinus,,conifer,fresh_or_dried,Pine nuts
+^08029099|^08029990,food_fodder,nøtter,,*,non_conifer,upper_bound;fresh_or_dried,Nuts n.e.s.
+^0803,food_fodder,bananer;kokebananer,Musa,,non_conifer,fresh_or_dried,
+^080410,food_fodder,dadler,Phoenix dactylifera,,non_conifer,fresh_or_dried,
+^08042010,food_fodder,fikener,Ficus carica,,non_conifer,,
+^080430,food_fodder,ananas,Ananas comosus,,non_conifer,fresh_or_dried,
+^080440,food_fodder,avocadopærer,Persea americana,,non_conifer,fresh_or_dried,
+^08045001,food_fodder,guavas,Psidium guajava,,non_conifer,fresh_or_dried,
+^08045002,food_fodder,mangos,Mangifera indica,,non_conifer,fresh_or_dried,
+^08045003,food_fodder,mangostan,Garcinia mangostana,,non_conifer,fresh_or_dried,
+^08045009,food_fodder,guavaer;mangostan,Psidium;Garcinia mangostana,,non_conifer,fresh_or_dried,
+^080510,food_fodder,appelsiner,Citrus x aurantium var. sinensis,,non_conifer,fresh_or_dried,
+^080520,food_fodder,mandariner;klementiner;wilkings,Citrus reticulata;Citrus x aurantium var. clementina;Citrus x aurantium var. unshiu;Citrus x aurantium var. tangerina;Citrus x aurantium var. deliciosa;Citrus x nobilis;Citrus x tangelo,,non_conifer,fresh_or_dried,Mandarins and hybrids (code valid to 2016)
+^080521,food_fodder,mandariner;tangeriner;satsumas,Citrus reticulata;Citrus x aurantium var. unshiu;Citrus x aurantium var. tangerina;Citrus x aurantium var. deliciosa,,non_conifer,fresh_or_dried,
+^080522,food_fodder,klementiner,Citrus x aurantium var. clementina,,non_conifer,fresh_or_dried,
+^080529,food_fodder,wilkings,Citrus x nobilis;Citrus x tangelo,,non_conifer,fresh_or_dried,"Citrus hybrids (wilkings, tangelo)"
+^080540,food_fodder,grapefrukt,Citrus x aurantium var. paradisi;Citrus maxima,,non_conifer,fresh_or_dried,
+^08055010,food_fodder,sitroner;limefrukter,Citrus x limon;Citrus x aurantiifolia;Citrus x latifolia,,non_conifer,fresh_or_dried,
+^08055020,food_fodder,sitroner,Citrus x limon,,non_conifer,fresh_or_dried,
+^08055030,food_fodder,limefrukter,Citrus x aurantiifolia;Citrus x latifolia,,non_conifer,fresh_or_dried,
+^080590,food_fodder,sitrusfrukter,Citrus;Fortunella;Citroncirus;x Citrofortunella,Citrus x aurantium var. sinensis;Citrus reticulata;Citrus x aurantium var. clementina;Citrus x aurantium var. unshiu;Citrus x aurantium var. tangerina;Citrus x aurantium var. deliciosa;Citrus x nobilis;Citrus x tangelo;Citrus x aurantium var. paradisi;Citrus maxima;Citrus x limon;Citrus x aurantiifolia;Citrus x latifolia,non_conifer,upper_bound;fresh_or_dried,Other citrus (incl. kumquat)
+^080610,food_fodder,druer,Vitis,,non_conifer,,
+^080711,food_fodder,vannmeloner,Citrullus lanatus,,non_conifer,,
+^080719,food_fodder,meloner,Cucumis melo,,non_conifer,,
+^080720,food_fodder,papayas,Carica papaya,,non_conifer,,
+^080810,food_fodder,epler,Malus,,non_conifer,,
+^080830,food_fodder,pærer,Pyrus,,non_conifer,,
+^080840,food_fodder,kveder,Cydonia oblonga,,non_conifer,,
+^080910,food_fodder,aprikoser,Prunus armeniaca,,non_conifer,,
+^080921,food_fodder,surkirsebær,Prunus cerasus,,non_conifer,,
+^080929,food_fodder,kirsebær;moreller,Prunus avium,,non_conifer,,
+^0809301|^0809302,food_fodder,ferskener,Prunus persica,,non_conifer,,
+^0809303|^0809309,food_fodder,nektariner,Prunus persica,,non_conifer,,
+^080940[1-5],food_fodder,plommer,Prunus domestica;Prunus salicina;Prunus cerasifera;Prunus domestica subsp. insititia,,non_conifer,,
+^08094060,food_fodder,slåpefrukter,Prunus spinosa,,non_conifer,,
+^081010,food_fodder,jordbær,Fragaria,,non_conifer,,
+^08102010,food_fodder,bringebær,Rubus idaeus,,non_conifer,,
+^08102090,food_fodder,bjørnebær;morbær;loganbær,Rubus;Morus,,non_conifer,,
+^08103010,food_fodder,solbær,Ribes nigrum,,non_conifer,,
+^08103020,food_fodder,rips,Ribes rubrum;Ribes,,non_conifer,,
+^08103030,food_fodder,stikkelsbær,Ribes uva-crispa,,non_conifer,,
+^08104010,food_fodder,tyttebær,Vaccinium vitis-idaea,,non_conifer,,
+^08104090,food_fodder,tranebær;blåbær,Vaccinium,,non_conifer,,
+^081050,food_fodder,kiwifrukt,Actinidia,,non_conifer,,
+^081060,food_fodder,durian,Durio zibethinus,,non_conifer,,
+^081070,food_fodder,kakiplommer,Diospyros kaki,,non_conifer,,
+^08109010,food_fodder,multer,Rubus chamaemorus,,non_conifer,,
+^08109090,food_fodder,frukter,,*,non_conifer,upper_bound,Fruits n.e.s.: counts for hosts without their own line
+^060311,other_plant_parts,roser,Rosa,,non_conifer,,
+^060312,other_plant_parts,nelliker,Dianthus,,non_conifer,,
+^060313,other_plant_parts,orkideer,Orchidaceae,,non_conifer,,
+^060314,other_plant_parts,krysantemum,Chrysanthemum,,non_conifer,,
+^060315,other_plant_parts,liljer,Lilium,,non_conifer,,
+^0603191[12],other_plant_parts,buketter,,,non_conifer,upper_bound,Mixed bouquets: count for any non-conifer host
+^06031921,other_plant_parts,symre;ginst;mimosa;soleie;syrin,Anemone;Genista;Acacia;Ranunculus;Syringa,,non_conifer,,
+^06031922,other_plant_parts,margeritt;freesia;tulipan,Argyranthemum;Freesia;Tulipa,,non_conifer,,
+^06031991,other_plant_parts,marikåpe;flamingoblomst;asters;astilbe;knoppurt;bakkestjerne;gerbera;sabellilje,Alchemilla;Anthurium;Aster;Astilbe;Centaurea;Erigeron;Gerbera;Gladiolus;Lathyrus;Liatris;Physostegia;Protea;Scabiosa;Sedum;Solidago;x Solidaster;Strelitzia;Trachelium;Zinnia,,non_conifer,,Genera from the tariff text
+^06031992,other_plant_parts,tulipan,Tulipa,,non_conifer,,
+^06031994,other_plant_parts,margerit;margeritt,Argyranthemum;Leucanthemum,,non_conifer,,
+^06031995,other_plant_parts,slør,Gypsophila,,non_conifer,,
+^06031996,other_plant_parts,alstroemeria,Alstroemeria,,non_conifer,,
+^06031998,other_plant_parts,blomster,,*,non_conifer,upper_bound,Cut flowers n.e.s.: counts for hosts without their own line
+^06042010,other_plant_parts,adianthum;asparagus,Adiantum;Asparagus,,non_conifer,,
+^06042092,other_plant_parts,juletrær,Abies;Picea;Pinus;Pseudotsuga,,conifer,,Christmas trees
+^06042099,other_plant_parts,lauvverk;greiner;blad,,,both,upper_bound,Fresh foliage and branches of any plant (incl. conifer and citrus branches)
+^10011100,seeds,durumhvete,Triticum durum;Triticum turgidum,,non_conifer,,
+^10019100,seeds,hvete,Triticum;Secale cereale,,non_conifer,,Wheat and meslin
+^10021000,seeds,rug,Secale cereale,,non_conifer,,
+^10031000,seeds,bygg,Hordeum vulgare,,non_conifer,,
+^10041000,seeds,havre,Avena,,non_conifer,,
+^10051000,seeds,mais,Zea mays,,non_conifer,,
+^10071000,seeds,sorghum,Sorghum,,non_conifer,,
+^10082100,seeds,hirse,Panicum;Cenchrus;Setaria;Eleusine;Echinochloa,,non_conifer,,Millets
+^12091000,seeds,sukkerbetefrø,Beta vulgaris,,non_conifer,,
+^12092100,seeds,lusernefrø;alfalfafrø,Medicago sativa,,non_conifer,,
+^12092201,seeds,rødkløverfrø,Trifolium pratense,,non_conifer,,
+^12092209,seeds,kløverfrø,Trifolium,,non_conifer,,
+^12092300,seeds,svingelfrø,Festuca,,non_conifer,,
+^12092400,seeds,engrappfrø,Poa pratensis,,non_conifer,,
+^12092500,seeds,raigrasfrø,Lolium,,non_conifer,,
+^12092910,seeds,kveinfrø;veinfrø,Agrostis,,non_conifer,,Tariff: kveinfrø (bent grass)
+^12092920,seeds,hundegras;rappgras;revehalefrø,Dactylis;Poa;Alopecurus,,non_conifer,,
+^12092931,seeds,turnipsfrø;kålrotfrø,Brassica rapa;Brassica napus,,non_conifer,,
+^12092932,seeds,forbetefrø,Beta vulgaris,,non_conifer,,
+^12092939,seeds,betefrø,Beta,,non_conifer,,
+^12092940,seeds,timoteifrø,Phleum pratense,,non_conifer,,
+^12092990,seeds,forplanter,Poaceae;Fabaceae,*,non_conifer,upper_bound,Forage seeds n.e.s.: grasses and legumes without their own line
+^12093000,seeds,blomster,,*,non_conifer,upper_bound,Flower seeds: counts for hosts without their own line
+^12099110,seeds,agurkfrø;blomkålfrø;gulrotfrø;løkfrø;persillefrø;salatfrø,Cucumis sativus;Brassica oleracea;Daucus carota;Allium cepa;Petroselinum crispum;Lactuca sativa,,non_conifer,,
+^12099191,seeds,kålfrø,Brassica oleracea;Brassica,,non_conifer,,
+^12099199,seeds,grønnsaksfrø,@vegetables,*,non_conifer,upper_bound,"Vegetable seeds n.e.s. (e.g. tomato and pepper seed): vegetable crops (taxa of the chapter 07 lines) without their own seed line"
+^12099900,seeds,frø,,*,both,upper_bound,Seeds n.e.s. (incl. tree seeds)

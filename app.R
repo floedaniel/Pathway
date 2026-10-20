@@ -1,6 +1,5 @@
 # Pathwise: pest import risk (FinnPRIO ENT3) from a single EPPO code.
 library(shiny)
-library(config)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(f)
 

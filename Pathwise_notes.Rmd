@@ -29,8 +29,8 @@ Working agreements (from the user):
 
 ## Status
 
-- **App:** complete for v1. Single input, four panels, LLM write-up. All 318 test pests run through the pipeline without R errors (final debugging pass, decision 45).
-- **Tests:** all offline tests pass (253 expectations) (`testthat::test_dir("tests/testthat")`).
+- **App:** single input, four panels, LLM write-up; all five FinnPRIO pathways computed when EPPO lists the commodity (decision 57). All 318 test pests run through pipeline, Panel 1, graph and write-up without R errors (sweep 2026-10-20 after decisions 55-57: plants for planting 298 pests, wood 156, other plant parts 75, food and fodder 56, seeds 23).
+- **Tests:** all offline tests pass (306 expectations) (`testthat::test_dir("tests/testthat")`).
 - **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `dbca7e9` (2026-10-20, includes decisions 52-54). Redeploy after changes with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
@@ -85,35 +85,45 @@ Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant comm
 - non_conifer: any other plant (kingdom Plantae), incl. herbaceous plants, cycads, Ginkgo, ferns. No woody test (the woody list was dropped).
 - monocot: EPPO category "Basal monocotyledons" or "Commelinids".
 - EPPO commodity groups used as hosts: 2PLAN plants and 2WOOP woody plants -> all plants (both groups, no genus filter); 2VEGP, 2FRUP, 2ORNH, 2HERP -> non_conifer. Unknown group -> all plants.
-- Taxonomy cached permanently per host code.
+- Each host also gets `taxa` (its EPPO name and lineage names from family down, e.g. "Solanaceae;Solanum;Solanum lycopersicum") and `rank` (its own EPPO rank) for matching CN8 lines (decision 57; user: "use the EPPO API for taxonomy").
+- Taxonomy cached permanently per host code. `eppo_taxonomy()` includes the taxon itself as the last row; varieties are typed "Species" (e.g. CIDSI Citrus x aurantium var. sinensis under genus Citrus).
 
 ### Pathways (`R/pathways.R`, `data/eppo_commodity_map.csv`)
-FinnPRIO ids. Hitchhiking, natural spread and intentional introduction are removed (decision 27).
+FinnPRIO ids. Hitchhiking, natural spread and intentional introduction are removed (decision 27). All five pathways are computed when EPPO lists a matching commodity (decision 57).
 
 | EPPO category | FinnPRIO pathway | Status | CN8 scope |
 |---|---|---|---|
-| plants for planting | plants_for_planting | computed | 0602 |
-| bulbs or tubers | plants_for_planting | computed | 0601 |
+| plants for planting | plants_for_planting | computed | 0602; 0701 10 seed potatoes (potato only) |
+| bulbs or tubers | plants_for_planting | computed | 0601 (not for potato, HS ch. 6 notes); 0701 10 |
 | non-squared wood | wood | computed | 4403, 4401 firewood/chips, 4404 |
 | squared wood | wood | computed | 4406, 4407 |
 | bark | wood | computed | 4401 40-49 waste incl. bark |
 | packaging material | wood | computed | 4415 (only packaging traded as goods) |
 | manufactured articles | wood | computed | 4416, 9406.10 (partial; 4409-4421 not included) |
 | plant waste | wood | computed | 4401 40-49 (partial) |
-| seeds | seeds | manual | - |
-| cut flowers or branches, pollen | other_plant_parts | manual | - |
-| fruits or vegetables, stored products | food_fodder | manual | - |
+| fruits or vegetables | food_fodder | computed | fresh or chilled 0701-0709, 0714, 0801-0810 |
+| cut flowers or branches | other_plant_parts | computed | fresh 0603; 0604 20 (foliage, branches, Christmas trees) |
+| seeds | seeds | computed | 10 .. såkorn; 12 09 såvare (kg) |
+| stored products | food_fodder | manual | no CN line (not fresh) |
+| pollen | other_plant_parts | manual | no CN line |
 | soil/growing medium, agricultural machinery, all commodities | - | info | no CN line |
 
-Fallback (no EPPO list, or a list with only info categories such as soil): both computed pathways (plants_for_planting and wood) for all host plants, with all their CN8 categories; 0601 counts only when a host is a monocot (`choose_pathways()`, `pathway_info()`). With an EPPO list, 0601 follows the list (bulbs or tubers) instead of the monocot rule.
+Fallback (no EPPO list, or a list with only info categories such as soil): plants_for_planting and wood only (`fallback_pathways`), for all host plants, with all their CN8 categories; 0601 counts only when a host is a monocot (`choose_pathways()`, `pathway_info()`). With an EPPO list, 0601 follows the list (bulbs or tubers) instead of the monocot rule. A pathway whose EPPO categories are all "manual" (e.g. only stored products) is listed as "assess manually" (`r$pathways` minus `names(r$pathway_info)`).
 
 ### CN8 lines (`data/commodity_cn8.csv`, built by `dev/build_commodity_cn8.R`)
-- 134 lines: 32 plants_for_planting, 102 wood. Built from SSB metadata + the customs tariff JSON.
-- Columns: pathway, cn8 (versioned, e.g. `06029021_2011`), description (SSB), tariff_description, tariff_label (unique short label), commodity_group (conifer / non_conifer / both / monocot), eppo_category, genus, excludes_genera, flags (upper_bound, mixed, waste, with_bark, ...), source, valid_from, valid_to, notes, reviewed.
-- Scope: plants = all 0602 (vedlegg 5A nr. 1) + 0601; wood = vedlegg 5A nr. 8 scope matched on wording + 9406.10. Out: tropical wood, eucalyptus round wood, pellets/briquettes, impregnated/treated wood.
-- **Genus filter** (decisions 33, 39, 44, 45): genus-specific lines (furu/Pinus, gran = Picea AND Abies per tariff, eik/Quercus, bøk/Fagus, bjørk/Betula, poppel/osp Populus, ask/Fraxinus, lønn/Acer, kirsebær/Prunus, Rhododendron, Rosa, Pelargonium, Chrysanthemum lists) count only when a host is in the genus. Residual lines ("other conifers / broadleaved") count only when a host genus is outside the listed genera; judged on genera only, not families. Mixed lines count for any host. Hosts known only above genus are not filtered.
+- 423 lines: 33 plants_for_planting, 102 wood, 218 food_fodder, 43 other_plant_parts, 27 seeds. Built from SSB metadata + the customs tariff JSON + `data/cn8_host_taxa.csv`.
+- Columns: pathway, cn8 (versioned, e.g. `06029021_2011`), description (SSB), tariff_description, tariff_label (unique short label), commodity_group (conifer / non_conifer / both / monocot), eppo_category, genus (= taxa the line covers: genus, species or family), excludes_genera (residual exclusions, or "*"), flags (upper_bound, fresh_or_dried, with_bark, debarked, conifer_catch_all, monocot_only), source, valid_from, valid_to, notes, reviewed.
+- Scope: plants = all 0602 (vedlegg 5A nr. 1) + 0601 + 0701 10; wood = vedlegg 5A nr. 8 scope matched on wording + 9406.10 (out: tropical wood, eucalyptus round wood, pellets/briquettes, impregnated/treated wood); food = fresh or chilled only (wording frisk/fersk/kjølt; mushrooms out); other plant parts = fresh 0603, 0604 20; seeds = såkorn, såvare.
+- **Crop-name table `data/cn8_host_taxa.csv`** (decision 57; user: "you do everything"): pattern (regex on cn8) | pathway | norwegian (words used in the labels; also feed the host search) | taxa (EPPO preferred names; "@vegetables" = all taxa of the chapter 07 lines) | excludes | commodity_group | flags | note. All Latin names checked with `Rscript dev/check_host_taxa.R` (writes `dev/check_host_taxa_result.csv`; 180 of 180 ok). Norwegian words checked against the tariff text (which often gives the Latin name in brackets) and Lid's flora (`data/Lids_flora.xls`, local copy from the user, git-ignored, not deployed). EPPO spellings to remember: orange Citrus x aurantium var. sinensis, grapefruit C. x aurantium var. paradisi, clementine C. x aurantium var. clementina, satsuma C. x aurantium var. unshiu, lemon C. x limon, lime C. x aurantiifolia / C. x latifolia; millet Cenchrus (not Pennisetum); Tetragonia tetragonoides; x Solidaster; kveinfrø = Agrostis.
+- **Host matching** (`cn8_lines()`, `host_in()`, `norm_taxon()` in `R/api_ssb.R`): hosts are list(taxa, rank).
+  - Line with taxa: counts when a host's taxa include one of them, or a genus-level host contains a listed species (Solanum host -> tomatoes, potatoes, aubergines).
+  - Residual with exclusions (wood "other broadleaved", "other Allium", "other citrus", "other legumes"): counts when a host (within the line's taxa, if any) is not covered by the exclusions.
+  - "*" (n.e.s.): counts for hosts that no other line of the pathway names. A scoped "*" line (with taxa: forage seeds = Poaceae;Fabaceae, vegetable seeds = @vegetables) yields only to non-"*" lines; an unscoped one (seeds n.e.s., fruits n.e.s.) also yields to scoped ones.
+  - No taxa, no exclusions: mixed line, counts for any host.
+  - Hybrid sign ignored ("Citrus x limon" = "Citrus limon"); old-style character vectors of genera (tests) still accepted (`as_hosts()`).
+- **Genus filter, wood and plants** (decisions 33, 39, 44, 45): genus-specific lines (furu/Pinus, gran = Picea AND Abies per tariff, eik/Quercus, bøk/Fagus, bjørk/Betula, poppel/osp Populus, ask/Fraxinus, lønn/Acer, kirsebær/Prunus, Rhododendron, Rosa, Pelargonium, Chrysanthemum lists) count only when a host is in the genus. Residual lines ("other conifers / broadleaved") count only when a host genus is outside the listed genera. Mixed lines count for any host. Hosts known only above genus are not filtered.
 - 06029021 is all trees and shrubs with soil n.e.s. (tariff), not the genera SSB's short label lists. Its genus restriction was a bug and is removed.
-- Rebuild after SSB or tariff changes: `Rscript dev/build_commodity_cn8.R` (also writes `data/genus_names_no.csv`).
+- Rebuild after SSB, tariff or crop-name-table changes: `Rscript dev/build_commodity_cn8.R` (also writes `data/genus_names_no.csv`, now with the crop names), then `Rscript dev/check_host_taxa.R` if names changed.
 
 ### Volume class (`R/volume_class.R`)
 - `data/finnprio_thresholds.csv`: `x < 1,000,000` small; `x <= 10,000,000` medium; else large. kg only.
@@ -157,7 +167,7 @@ Regulation:
 Note: <pathway notes>
 ```
 
-- The LLM (OpenAI, `gpt-5.5-2026-04-23`) writes only the Regulation lines: one sentence per unit, each must start with a Panel 3 id (`validate_regulation()`); otherwise the unit text is shown (`regulation_fallback()`). Cached per units + model; Regenerate bypasses the cache.
+- The LLM (OpenAI, `gpt-5.4-mini-2026-03-17`, decision 55) writes only the Regulation lines: one sentence per unit, each must start with a Panel 3 id (`validate_regulation()`); otherwise the unit text is shown (`regulation_fallback()`). Cached per units + model; Regenerate bypasses the cache.
 - Units: those naming the pest, then origin rules, in regulation order.
 - No imports at all: "ENT3: none recorded" and "...: no recorded imports (2016-2025)".
 - "mixed line" = flagged upper_bound AND not naming a host genus (`mixed_line(flags, genus)`); a birch-only code is never called mixed.
@@ -172,7 +182,7 @@ Note: <pathway notes>
 | `R/cache.R` | `cached(source, query, fetch, settings)`, digest key, TTL per source, files in `cache/`. |
 | `R/api_eppo.R` | EPPO API v2 client, gd.eppo.int scraper (`eppo_host_commodities()`), `resolve_input()`, hosts, present countries. |
 | `R/classify_hosts.R`, `R/host_to_groups.R` | Lineage classification; groups for the run. |
-| `R/api_ssb.R` | SSB metadata and imports (chunks of 25 lines), `cn8_lines()`, `pathway_lines()`, genus filter. |
+| `R/api_ssb.R` | SSB metadata and imports (chunks of 25 lines, pest-present filter), `cn8_lines()` (host matching on EPPO taxa), `pathway_lines()`, `host_genera_by_group()`. |
 | `R/volume_class.R` | Thresholds, `annual_totals()`, `classify_volume()`, `classify_pathway()`. |
 | `R/pathways.R` | FinnPRIO pathway ids, labels, types. |
 | `R/pipeline.R` | `run_assessment()`, `choose_pathways()`, `pathway_info()`, `pinfo()`. |
@@ -180,7 +190,8 @@ Note: <pathway notes>
 | `R/law_index.R` | Lovdata download, parse, index, search. |
 | `R/prompts.R`, `R/llm_provider.R` | Write-up layout, regulation prompt, validation; `llm_chat()` via ellmer (openai / claude / hf). |
 | `R/mod_input.R`, `mod_table.R`, `mod_graph.R`, `mod_law.R`, `mod_writeup.R` | Shiny modules: input and panels 1-4. |
-| `dev/build_commodity_cn8.R` | Builds `data/commodity_cn8.csv` and `data/genus_names_no.csv`. |
+| `dev/build_commodity_cn8.R` | Builds `data/commodity_cn8.csv` and `data/genus_names_no.csv` (from SSB, the tariff and `data/cn8_host_taxa.csv`). |
+| `dev/check_host_taxa.R` | Checks every Latin name in `data/cn8_host_taxa.csv` against EPPO (must be the preferred name). |
 | `dev/record_eppo_fixtures.R` | Records EPPO responses for the tests. |
 | `dev/write_manifest.R` | Writes `manifest.json` (for Git-based Connect Cloud deploys). |
 | `dev/deploy.R` | Deploys to Posit Connect Cloud. |
@@ -191,13 +202,13 @@ Note: <pathway notes>
 
 - `README.md`: user guide (quick start, keys, panels, method, caveats, sources, deployment).
 - `docs/vignette.md`: worked example, AGRLAX step by step, real numbers from a run on 2026-10-20. Markdown, not R Markdown, because rmarkdown is not in the project library. Re-run and update the numbers if the method changes.
-- `docs/decisions.md`: decisions 1-54 (49 front page and graph, 50 deployment, 51 documentation, 52 pest-present countries only, 53 plain-language Panel 1, 54 Panel 1 layout).
+- `docs/decisions.md`: decisions 1-57 (49 front page and graph, 50 deployment, 51 documentation, 52 pest-present countries only, 53 plain-language Panel 1, 54 Panel 1 layout, 55 housekeeping answers, 56 seed potatoes, 57 more host groups).
 - `docs/findings.md`.
 - Reference copies: `docs/reference/eppo_gd_general_user-guide.pdf`, `docs/reference/tolltariffstruktur.json`.
 
 ## Configuration and keys
 
-- `config.yml`: host_classes [Major host, Host]; ssb_years 10; volume_n 10; volume_stat median; llm provider openai, model gpt-5.5-2026-04-23, hf_base_url; language en; cache dir and TTL days (eppo 30, eppo_taxonomy never, ssb 30, lovdata 7, llm never).
+- `config.yml`: host_classes [Major host, Host]; ssb_years 10; volume_n 10; volume_stat median; llm provider openai, model gpt-5.4-mini-2026-03-17, hf_base_url; language en; cache dir and TTL days (eppo 30, eppo_taxonomy never, ssb 30, lovdata 7, llm never).
 - Keys (env var wins, else file in `API_kays/`):
   - `EPPO_KEY` = `API_kays/EPPO_beta.txt`
   - `OPENAI_API_KEY` = `API_kays/tore_vkm_openai.txt`
@@ -224,7 +235,10 @@ Note: <pathway notes>
 - Most wood packaging travels with other goods and has no SSB line (4415 = packaging traded as goods).
 - Manufactured articles are partial (4416, 9406.10 only); veneer 4408, plywood 4412, profiled wood 4409 show up in the host search as "outside scope" (Open question 5).
 - Dicot bulbs/tubers are missed when EPPO has no list; soil has no CN line.
-- Seeds, food and fodder, and other plant parts are not computed (manual).
+- Food and fodder: only fresh or chilled. Seeds in kg, not pieces. Stored products and pollen have no CN line (assess manually).
+- 'n.e.s.' lines count for hosts without a line of their own: exotic hosts (e.g. Annona) get several (fruits, vegetables, roots, nuts n.e.s.).
+- Mixed 0602 lines (trees and shrubs, perennials) count for every host, also herbaceous crops such as potato or tomato (open question 16).
+- EPPO 'packaging material' maps to wood packaging (4415), also for non-woody hosts (open question 15).
 - EPPO host commodities exist only for EPPO/EU-listed pests (80 % of A1/A2, 0 % of the Alert list); the rest use host plants.
 - Mattilsynet holds genus-level import data (§ 20, § 23a); a data request, not in v1.
 
@@ -238,7 +252,9 @@ Note: <pathway notes>
 - **Genus vs higher taxon:** matching a pest's genus alone in Lovdata gave false hits (*Agrilus*); higher taxa count only as "X spp.".
 - **Families switch on residual lines:** judge residual CN8 lines on genera only.
 - Cold run ~30 s, cached a few seconds.
-- `app.R` has a user-added `library(config)`, which masks `base::get`/`merge` and prints a warning. Not needed (settings use `config::get()`); see Open question 6.
+- `library(config)` was removed from `app.R` (it masked `base::get`/`merge`; settings use `config::get()`).
+- Reading files in the OneDrive project folders is blocked by the permission classifier; the user copies needed files into the project (e.g. `data/Lids_flora.xls`).
+- `ifelse()` on a zero-length vector returns logical(0): wrap with `as.character()` before `strsplit()` (bug in the sweep, pests without imports).
 
 ## Results worth remembering
 
@@ -248,6 +264,7 @@ Note: <pathway notes>
 - **AGRLAX, earlier:** hosts all *Betula*, present in CA and US. EPPO list: plants for planting, squared and non-squared wood, bark, manufactured articles, packaging, all *Betula*. Before the genus filter 90 % of "non-conifer wood from pest-present countries" was oak; with it ~47 t/year (mostly pallets) instead of 5.3 million kg. Lovdata: Vedlegg 1 nr. 2.1 (pest), Vedlegg 4A nr. 45, origin rule Vedlegg 3 nr. 11 (*Betula* from Canada and USA).
 - **IPSXCA wood (before decision 52):** all origins 1.26 billion kg; pest-present origins 0.43 million kg.
 - **Sweep of 318 pests:** 215 get pathways from EPPO host commodities, the rest from host plants. XANTPD stops (no hosts in EPPO), which is correct.
+- **Pilot for more host groups (decision 57; pest-present countries only):** Tuta absoluta food 23.7 million kg (large, tomatoes); ToBRFV food 43.3 million kg, seeds 40 102 kg; Clavibacter sepedonicus food 5.1 million kg (medium, ware potatoes); Phyllosticta citricarpa food 14.9 million kg (oranges, clementines, limes); Ips calligraphus fresh branches 71 288 kg; Clavibacter michiganensis seeds 25 428 kg (vegetable seeds n.e.s.). Details in `docs/findings.md`.
 
 ## History (commits)
 
@@ -264,8 +281,9 @@ Note: <pathway notes>
 11. Decision 52: imports only from countries where the pest is present (Norway excluded); Panel 1, graph and write-up reworked; docs updated.
 12. Decision 53: plain-language headings and columns in Panel 1; "Only the host?" column replaces the flags column; genus-specific codes no longer called "mixed line".
 13. Decision 54: Panel 1 restructured: summary first, one card per pathway, identical tables with total rows.
+14. Decisions 55-57: answers to questions 1-14: mini model, no password (not on the free plan), library(config) removed; seed potatoes; food and fodder, other plant parts and seeds computed; host matching on EPPO taxonomy; crop-name table.
 
-Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; effectively replaced by Connect Cloud). See Open questions 2 and 3.
+Plan steps dropped by the user: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; replaced by Connect Cloud).
 
 # Part 2: Reference
 
@@ -299,7 +317,7 @@ Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare
 - Used by `dev/build_commodity_cn8.R` for `tariff_description`, `tariff_label` and the Norwegian genus names.
 
 ## OpenAI (write-up)
-- Provider and model in `config.yml` (`llm.provider: openai`, `llm.model: gpt-5.5-2026-04-23`). Key: env `OPENAI_API_KEY` or `API_kays/tore_vkm_openai.txt`. Called through ellmer (`chat_openai`).
+- Provider and model in `config.yml` (`llm.provider: openai`, `llm.model: gpt-5.4-mini-2026-03-17`; the key also offers gpt-5.x, gpt-6 models). Key: env `OPENAI_API_KEY` or `API_kays/tore_vkm_openai.txt`. Called through ellmer (`chat_openai`).
 
 ## Posit Connect Cloud
 - Account `danielflow`, server `connect.posit.cloud`, app name `pathwise`. URLs in Part 1, Status.
@@ -309,34 +327,11 @@ Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare
 Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`.
 
 ## Open questions for me
-1. **OpenAI model.** Write-ups use `gpt-5.5-2026-04-23` (pinned dated release; the key also offers newer gpt-6 variants). Keep it, or pick another in `config.yml` (`llm.model`)?
-2. **Step 11 (model comparison).** The plan compared Claude and 2-3 Hugging Face models. With OpenAI chosen, and the LLM now writing only the regulation sentences, still wanted, or skip?
-3. **Step 12 (laptop + Cloudflare tunnel).** The app now runs on Posit Connect Cloud. Drop Step 12?
-5. **Host search hits outside the scope.** Searching 08801 for the host (e.g. bjørk) also finds birch veneer sheets (4408) and plywood with a birch face (4412); for conifers also profiled wood (4409) and plywood. They are listed in Panel 1 as 'not counted' (outside Vedlegg 5A nr. 8). Should any of them count, e.g. for EPPO's 'manufactured articles'?
-6. **`library(config)` in app.R.** It masks `base::get` and `base::merge` and prints a warning at start; the app does not need it. Remove it?
-7. **Access to the online app.** It is public (anyone with the link, using your EPPO and OpenAI keys). Keep it public, restrict it in the Connect Cloud dashboard, or add a password?
+Questions 1-14 were answered on 2026-10-20 (decisions 55-57 in `docs/decisions.md`).
 
-### Next step: more host groups (feasibility report 2026-10-20, no code yet)
-Background: only plants for planting and wood are computed today. Counts from the EPPO host-commodity lists of the 318 test pests (222 have a list):
-
-| EPPO category | FinnPRIO pathway | Pests | Main hosts | Customs chapters |
-|---|---|---|---|---|
-| cut flowers or branches | other_plant_parts | 75 | Citrus (24), Pinus/Picea/Abies (17), Quercus, Vitis | 0603, 0604 (incl. Christmas trees) |
-| fruits or vegetables | food_fodder | 56 | Citrus (16), tomato (12), potato (9), aubergine (8), Prunus, Pyrus, Malus, mango, Capsicum, cucurbits | 07, 08 |
-| seeds | seeds | 23 | maize, groundnut, cotton, rice, grasses | 1209, 1005 10, 1201 10 ... |
-| stored products / pollen | food_fodder / other_plant_parts | 3 / 1 | | |
-
-134 pests have at least one category that is not computed; for 19 nothing is computed today; 24 have Solanum in such a category. EPPO often lists food hosts as species (Solanum lycopersicum, S. tuberosum), so the CN8 table needs species-level matching, not only genus.
-
-Proposed order (my recommendation): (1) seed potatoes 0701 10 in plants for planting; (2) food and fodder, pilot on Solanum (tomato, potato, aubergine) + Capsicum, checked on Tuta absoluta, ToBRFV, Ralstonia, Clavibacter sepedonicus, Epitrix, then all fresh fruit and vegetables; (3) cut flowers, foliage and branches (incl. Christmas trees); (4) seeds.
-
-8. **Order of work.** Go ahead in the order above (pilot on tomato/potato within food and fodder), or another order (tomato/potato only, or all categories at once)?
-9. **Seed potatoes (gap found).** Seed potatoes are CN 0701 10, not 0602. For a pest with "plants for planting of Solanum tuberosum" the app counts the mixed 0602 lines and misses seed potatoes. Fix first: add 0701 10 to plants for planting, counted only for potato hosts?
-10. **Processing state for food and fodder.** Count only fresh or chilled products (e.g. 0701, 0702, 0805), or also frozen (0710) and dried (0712)? My suggestion: fresh/chilled only (living material carries the pest).
-11. **Seeds unit.** FinnPRIO assesses seeds in pieces; SSB 08801 gives kg. (a) use kg anyway, (b) convert with a thousand-seed weight per crop (needs a reviewed table), or (c) keep seeds manual?
-12. **Pests without an EPPO list.** Today they get plants for planting and wood from their host plants. For food and fodder and cut branches: (a) use only codes that name a host species (e.g. 0702 tomatoes for a tomato host), (b) all codes of the chapter as an upper bound, or (c) not computed without an EPPO list?
-13. **Thresholds.** Are the ENT3 kg limits (small < 1 million, medium <= 10 million, else large) the same for food and fodder, cut flowers/branches and seeds?
-14. **Crop name table.** To map tariff wording to hosts ("tomater" -> Solanum lycopersicum, "poteter" -> S. tuberosum), the build script needs a Norwegian crop name -> Latin name table (draft from the tariff, about 150 fruit and vegetable lines, ~30 cut flower/foliage lines). OK that I draft it and you review it before it is used?
+15. **Packaging material for non-woody hosts.** EPPO lists "packaging material" e.g. for ToBRFV (tomato, pepper). The app maps it to wood packaging (4415 pallets and crates of any wood), giving ToBRFV a "large" wood pathway (51 million kg/year). For a tomato virus the packaging is more likely plastic crates or boxes. Keep it, count packaging only when a host is woody (e.g. conifer or a woody genus), or drop packaging for pests whose hosts are all herbaceous?
+16. **Mixed 0602 lines for herbaceous crops.** The catch-all plants-for-planting lines (06029021 trees and shrubs with soil, 06029022 perennials, ...) count for every host. For potato and tomato pests they dominate plants for planting (e.g. Clavibacter sepedonicus 11.2 million kg/year "large", mostly trees and shrubs; seed potatoes 0701 10 had no imports from its countries). Keep as upper bound, or leave out 0602 lines for hosts that have their own plants-for-planting code (seed potatoes)?
+17. **'n.e.s.' lines for exotic hosts.** A host without a code of its own (e.g. Annona for Bactrocera dorsalis) gets every 'n.e.s.' line of food and fodder: fruits, vegetables, roots and nuts n.e.s. OK as an upper bound, or should only one of them count (e.g. fruits n.e.s. when EPPO lists "fruits or vegetables" for a fruit tree)?
 
 # Appendix A: Original plan (2026-10-20, superseded where Part 1 or docs/decisions.md differ)
 

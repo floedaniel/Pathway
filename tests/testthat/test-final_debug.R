@@ -29,7 +29,7 @@ test_that("an EPPO list without any pathway category (soil only) falls back to h
   soil <- tibble::tibble(category = "soil/growing medium", host = "plants", host_code = "2PLAN")
   ch <- choose_pathways(soil, hosts, s)
   expect_equal(ch$source, "host_plants")
-  expect_setequal(names(ch$pc$info), computed_pathways)
+  expect_setequal(names(ch$pc$info), fallback_pathways)
   expect_equal(ch$pc$other, "soil/growing medium")
 })
 

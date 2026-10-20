@@ -5,8 +5,9 @@
 # - If EPPO lists host commodities for the pest (EPPO/EU-listed pests), the
 #   pathways, CN8 lines and host genera come from that list, via
 #   data/eppo_commodity_map.csv (category -> FinnPRIO pathway).
-# - Otherwise (no list), both computed pathways are assessed from the host plants
-#   (Major host / Host), as before; labelled in the UI.
+# - Otherwise (no list), plants for planting and wood are assessed from the host
+#   plants (Major host / Host), labelled in the UI; food and fodder, other plant
+#   parts and seeds need an EPPO list (user's decision 2026-10-20).
 # SSB is queried only for computed pathways, and only imports from countries where
 # the pest is present are kept (user's rule, 2026-10-20); ENT3 is their total.
 
@@ -42,7 +43,7 @@ pathways_from_commodities <- function(commodities, settings, map = read_commodit
     pathway_info(ch, categories = unique(rows$category), monocot = "bulbs or tubers" %in% rows$category)
   })
   list(info = info,
-       manual = unique(stats::na.omit(commodities$pathway[commodities$status == "manual"])),
+       manual = setdiff(unique(stats::na.omit(commodities$pathway[commodities$status == "manual"])), computed),
        other = unique(commodities$category[commodities$status == "info"]),
        table = commodities)
 }
@@ -55,7 +56,7 @@ choose_pathways <- function(commodities, classified, settings) {
   if (!is.null(pc) && (length(pc$info) > 0 || length(pc$manual) > 0)) {
     return(list(pc = pc, source = "eppo_commodities"))
   }
-  list(pc = list(info = lapply(stats::setNames(computed_pathways, computed_pathways), function(p) pathway_info(classified)),
+  list(pc = list(info = lapply(stats::setNames(fallback_pathways, fallback_pathways), function(p) pathway_info(classified)),
                  manual = character(), other = if (is.null(pc)) character() else pc$other,
                  table = if (is.null(pc)) commodities else pc$table),
        source = "host_plants")

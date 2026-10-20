@@ -1,15 +1,19 @@
-# FinnPRIO entry pathways (ids as in FinnPRIO). computed: ENT3 from SSB data.
-# manual: not computed in v1, assess manually. Hitchhiking, natural spread and
-# intentional introduction are left out of the app (decided 2026-10-20).
+# FinnPRIO entry pathways (ids as in FinnPRIO). All five are computed from SSB data
+# when EPPO lists a matching host commodity (decision 56); an EPPO category without
+# CN lines (stored products, pollen) is shown as "assess manually". Hitchhiking,
+# natural spread and intentional introduction are left out of the app (decided
+# 2026-10-20). Pests without an EPPO list get only plants for planting and wood,
+# from their host plants (fallback_pathways; user's decision 2026-10-20).
 
 finnprio_pathways <- tibble::tribble(
   ~id,                   ~label,                ~type,
   "plants_for_planting", "Plants for planting", "computed",
   "wood",                "Wood",                "computed",
-  "seeds",               "Seeds",               "manual",
-  "food_fodder",         "Food and fodder",     "manual",
-  "other_plant_parts",   "Other plant parts",   "manual"
+  "food_fodder",         "Food and fodder",     "computed",
+  "other_plant_parts",   "Other plant parts",   "computed",
+  "seeds",               "Seeds",               "computed"
 )
+fallback_pathways <- c("plants_for_planting", "wood")
 
 pathway_type <- function(id) finnprio_pathways$type[match(id, finnprio_pathways$id)]
 pathway_label <- function(id) finnprio_pathways$label[match(id, finnprio_pathways$id)]

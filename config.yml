@@ -16,7 +16,7 @@ default:
 
   llm:
     provider: openai        # openai | claude | hf
-    model: gpt-5.5-2026-04-23   # pinned release, chosen 2026-10-20 from the key's model list
+    model: gpt-5.4-mini-2026-03-17   # pinned small release: the LLM only writes one sentence per regulation unit (user: "most effective but cheap", 2026-10-20)
     hf_base_url: https://router.huggingface.co/v1
 
   language: en              # write-up language

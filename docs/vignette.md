@@ -51,7 +51,19 @@ EPPO's page `gd.eppo.int/taxon/AGRLAX/pathwayshosts` lists six host commodities,
 
 So the app computes two pathways, **plants for planting** and **wood**. The header says "Pathways from: EPPO host commodities (6 entries)". The full table, with each category's FinnPRIO pathway, is under *Derived inputs*.
 
-If EPPO had no list for the pest, the app would build both pathways from the host plants and say so in the header.
+If EPPO had no list for the pest, the app would build plants for planting and wood from the host plants and say so in the header.
+
+*A. anxius* has no food, cut-flower or seed commodities in its EPPO list. For pests that do, the app also computes **food and fodder** (fresh or chilled fruit and vegetables), **other plant parts** (fresh cut flowers, foliage, branches, Christmas trees) and **seeds** (seed grain and seeds for sowing, in kg). Examples from the pilot on 2026-10-20, imports from pest-present countries only:
+
+| Pest | Pathway | kg per year (median) | ENT3 | Main customs codes |
+|---|---|---|---|---|
+| *Tuta absoluta* (tomato) | food and fodder | 23.7 million | large | 0702 tomatoes (all seasons) |
+| *Clavibacter sepedonicus* (potato) | food and fodder | 5.1 million | medium | 0701 90 ware potatoes |
+| *Phyllosticta citricarpa* (citrus) | food and fodder | 14.9 million | large | 0805 10 oranges, 0805 22 clementines, 0805 50 limes |
+| *Ips calligraphus* (pine) | other plant parts | 71 288 | small | 0604 20 99 fresh foliage and branches |
+| *Clavibacter michiganensis* (tomato) | seeds | 25 428 | small | 1209 91 99 vegetable seeds n.e.s. |
+
+For food and other crops, hosts are matched on the EPPO taxonomy. Tomato (*Solanum lycopersicum*) gets the tomato codes, not potatoes or aubergines; a host given only as the genus *Solanum* gets all three.
 
 ## 5. CN8 lines and the genus filter
 
@@ -143,7 +155,7 @@ The bars show imports per year from Canada and the USA, stacked by country, with
 
 ## 10. Write-up (Panel 4)
 
-One text per pathway, ready to paste into FinnPRIO. This is the wood text from the app, with the regulation sentences written by `gpt-5.5-2026-04-23`:
+One text per pathway, ready to paste into FinnPRIO. This is the wood text from the app, with the regulation sentences written by the LLM (this run: `gpt-5.5-2026-04-23`; the app now uses the smaller `gpt-5.4-mini-2026-03-17`, which gives very similar sentences):
 
 ```
 ENT3: Small

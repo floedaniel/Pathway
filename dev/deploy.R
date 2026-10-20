@@ -9,7 +9,7 @@ load_local_keys()
 stopifnot(nzchar(Sys.getenv("EPPO_KEY")), nzchar(Sys.getenv("OPENAI_API_KEY")))
 
 files <- list.files(".", recursive = TRUE)
-excluded <- "^(API_kays|API_keys|cache|renv/library|renv/staging|renv/sandbox|data/law/raw|old_scripts|tests|dev|docs|rsconnect)/|\\.Rproj$|\\.nb\\.html$|^Pathwise_notes|^manifest\\.json$"
+excluded <- "^(API_kays|API_keys|cache|renv/library|renv/staging|renv/sandbox|data/law/raw|old_scripts|tests|dev|docs|rsconnect)/|\\.Rproj$|^data/Lids_flora\\.xls$|\\.nb\\.html$|^Pathwise_notes|^manifest\\.json$"
 keep <- files[!grepl(excluded, files)]
 stopifnot(!any(grepl("API_ka|tore_vkm|EPPO_beta|\\.Renviron", keep)))
 

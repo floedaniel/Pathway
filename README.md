@@ -36,7 +36,7 @@ Type an EPPO code or a scientific name (e.g. `AGRLAX` or `Agrilus anxius`) and p
 
 * **Header:** pest and code, where the pathways come from, number of conifer and non-conifer hosts, the number of countries where the pest is present (whose imports are used), years.
 * **Panel 1, SSB table:** all numbers are imports from the countries where the pest is present.
-  * **Summary** first: one row per pathway. Columns: what it is based on, kg per year (median over 10 years), ENT3 class (`small`, `medium`, `large`), largest source country, largest customs code. Pathways to assess manually (e.g. seeds) are listed as such.
+  * **Summary** first: one row per pathway. Columns: what it is based on, kg per year (median over 10 years), ENT3 class (`small`, `medium`, `large`), largest source country, largest customs code. An EPPO commodity without a customs code (stored products, pollen) is listed as "assess manually".
   * **One numbered card per pathway** ("1. Plants for planting", "2. Wood"), with the ENT3 answer in the card header. Every card has the same two tables, with the same number columns: kg per year (median), kg in total over the 10 years, share of total, NOK in total, years with imports.
     * *By country*: one row per country with imports, plus its largest customs code. Countries without recorded imports are listed below.
     * *By customs code*: the customs (CN8) codes that make up the ENT3 amount, with a short tariff name (full text on hover). **Only the host?** says "Yes (Betula)" for a code that names the host genus and "No, also other species" for e.g. pallets of any wood.
@@ -63,7 +63,7 @@ EPPO code or scientific name
   -> SSB 08801: kg and NOK of the pathway's CN8 lines, 10 years,
        only from the countries where the pest is present (Norway excluded)
   -> sum over those countries per year, median over 10 years -> FinnPRIO class
-  -> SSB host search: all 08801 labels searched for the host genera
+  -> SSB host search: all 08801 labels searched for the host genera (Latin and Norwegian names)
   -> Lovdata FOR-2000-12-01-1333: units naming the pest, origin rules, host units
   -> write-up: fixed layout filled by R; LLM sentence per regulation unit, checked
 ```
@@ -79,35 +79,47 @@ Hosts are classified from the EPPO taxonomy lineage, without a hand-made list:
 EPPO commodity groups used as hosts work as follows. "Plants" and "woody plants" mean all plants, with no genus filter. "Vegetable", "fruit", "herbaceous" and "herbaceous ornamental plants" mean non-conifer.
 
 ### Pathways from EPPO host commodities
-EPPO lists host commodities, at genus level, for EPPO/EU-listed pests. There is no API endpoint for them. The app reads the table on `gd.eppo.int/taxon/{code}/pathwayshosts` once per pest and caches it for 30 days. `data/eppo_commodity_map.csv` maps each EPPO category to a FinnPRIO pathway:
+EPPO lists host commodities for EPPO/EU-listed pests, by host genus or species (e.g. *Betula*, *Solanum lycopersicum*). There is no API endpoint for them. The app reads the table on `gd.eppo.int/taxon/{code}/pathwayshosts` once per pest and caches it for 30 days. `data/eppo_commodity_map.csv` maps each EPPO category to a FinnPRIO pathway:
 
 | EPPO category | FinnPRIO pathway | CN8 scope |
 |---|---|---|
-| plants for planting | `plants_for_planting` | 0602 |
-| bulbs or tubers | `plants_for_planting` | 0601 |
+| plants for planting | `plants_for_planting` | 0602; 0701 10 seed potatoes (potato hosts only) |
+| bulbs or tubers | `plants_for_planting` | 0601 (not for potato); 0701 10 seed potatoes |
 | non-squared wood, squared wood | `wood` | 4401 firewood and chips, 4403, 4404, 4406, 4407 |
 | bark, plant waste | `wood` | 4401 40-49 sawdust and wood waste |
 | packaging material | `wood` | 4415 (only packaging traded as goods) |
 | manufactured articles | `wood` | 4416, 9406.10 (partial) |
-| seeds; cut flowers or branches, pollen; fruits or vegetables, stored products | `seeds`; `other_plant_parts`; `food_fodder` | not computed: assess manually |
+| fruits or vegetables | `food_fodder` | fresh or chilled products of chapters 07 and 08 (0701-0709, 0714, 0801-0810) |
+| cut flowers or branches | `other_plant_parts` | fresh 0603 cut flowers; 0604 20 foliage, branches, Christmas trees |
+| seeds | `seeds` | seed grain (10 .. "såkorn"), seeds for sowing (12 09 "såvare"), in kg |
+| stored products, pollen | `food_fodder`, `other_plant_parts` | no customs code: assess manually |
 | soil/growing medium, agricultural machinery, all commodities | none | information only |
 
-A pathway counts only the CN8 lines of the categories listed for it. Those lines are then filtered by the host genera listed for that pathway.
+A pathway counts only the CN8 lines of the categories listed for it. Those lines are then filtered by the hosts listed for that pathway (see *Host matching* below).
 
-Some pests have no list: about 20 % of A1/A2 pests and all Alert-list pests. Others list only soil or machinery. For these the app uses the host plants for both computed pathways and says so in the header. In this fallback, 0601 bulbs and tubers count only when a host is a monocot.
+Some pests have no list: about 20 % of A1/A2 pests and all Alert-list pests. Others list only soil or machinery. For these the app builds **plants for planting and wood only**, from the host plants, and says so in the header. Food and fodder, cut flowers and seeds need an EPPO list. In this fallback, 0601 bulbs and tubers count only when a host is a monocot.
 
 ### CN8 lines
-Lines are in `data/commodity_cn8.csv` (134 lines), built by `dev/build_commodity_cn8.R` from the current SSB labels and the customs tariff (Tolletaten). Every line records its source.
+Lines are in `data/commodity_cn8.csv` (423 lines: 33 plants for planting, 102 wood, 218 food and fodder, 43 other plant parts, 27 seeds). They are built by `dev/build_commodity_cn8.R` from the current SSB labels, the customs tariff (Tolletaten) and the crop-name table `data/cn8_host_taxa.csv`. Every line records its source.
 
 * **Scope:**
-  * Plants: all 0602 lines (FOR-2000-12-01-1333 vedlegg 5A nr. 1) and 0601.
-  * Wood: chapter 44 lines in the scope of vedlegg 5A nr. 8, plus prefabricated wooden buildings (9406.10).
-  * Excluded: tropical wood, eucalyptus round wood, pellets and briquettes, impregnated wood.
+  * Plants: all 0602 lines (FOR-2000-12-01-1333 vedlegg 5A nr. 1), 0601, and seed potatoes 0701 10.
+  * Wood: chapter 44 lines in the scope of vedlegg 5A nr. 8, plus prefabricated wooden buildings (9406.10). Excluded: tropical wood, eucalyptus round wood, pellets and briquettes, impregnated wood.
+  * Food and fodder: only **fresh or chilled** products (the tariff wording says "frisk", "fersk" or "kjølt"). Frozen, dried and preserved products and mushrooms are out. Lines worded "fresh or dried" (nuts, citrus, bananas) are in and flagged.
+  * Other plant parts: fresh cut flowers (0603) and fresh foliage, branches and Christmas trees (0604 20); dried or treated ones are out.
+  * Seeds: seed grain and seeds for sowing, counted in kg (FinnPRIO assesses seeds in pieces; kg by decision).
 * **Wording:** SSB labels are shortened. The tariff is the authority for what a line covers. 06029021, for example, is all trees and shrubs with soil not specified elsewhere, not only the genera SSB's label lists. The spruce lines cover fir *and* spruce.
-* **Genus filter:**
-  * A line that names a genus (birch, oak, pine, spruce and fir, beech, poplar, ash, maple, cherry, *Rhododendron*, *Rosa*, *Pelargonium*, ...) counts only when a host is in that genus.
-  * A residual line ("other broadleaved") counts only when a host genus is outside the genera listed in its wording.
-  * Mixed lines (firewood, chips, waste, packaging, catch-all plants) count for any host and are marked as an upper bound.
+
+### Host matching
+Hosts are matched on the **EPPO taxonomy**. Each host's EPPO name and lineage from family down (e.g. Solanaceae > *Solanum* > *Solanum lycopersicum*) comes from the EPPO API and is cached permanently.
+
+Each code names the taxa it covers: a genus (birch round wood = *Betula*), a species (tomatoes = *Solanum lycopersicum*, oranges = *Citrus x aurantium var. sinensis*) or a family (orchids = Orchidaceae). For the new pathways these names are in `data/cn8_host_taxa.csv`, the crop-name table. That table maps each code pattern to its pathway, the Norwegian words used in the labels, the taxa, exclusions, host group and flags. All Latin names are EPPO preferred names; `Rscript dev/check_host_taxa.R` checks them against the EPPO database.
+
+* **Code that names taxa:** counts when a host belongs to one of them. A genus-level host (e.g. "*Solanum*") also counts for the species codes of its genus (tomatoes, potatoes, aubergines).
+* **Residual code with exclusions** ("other broadleaved", "other Allium"): counts when a host is not covered by the exclusions.
+* **"Not elsewhere specified" code** ("vegetables n.e.s.", "fruits n.e.s.", "vegetable seeds n.e.s."): counts for hosts that no other code of the pathway names. Some are scoped: forage seeds only for grasses and legumes, vegetable seeds only for vegetable crops. They are marked as an upper bound.
+* **Mixed code** (pallets, firewood, catch-all plants, foliage and branches): counts for any host and is marked as an upper bound.
+* The hybrid sign is ignored when comparing names ("Citrus x limon" = "Citrus limon").
 
 ### ENT3 classes
 Classes come from `data/finnprio_thresholds.csv`. They are applied to the median annual kg, summed over the countries where the pest is present, for 2016-2025: under 1 000 000 is small, up to and including 10 000 000 is medium, and anything above is large.
@@ -125,7 +137,7 @@ ENT3: Small
 Annual import into Norway of wood (CN 44, 9406.10) from the countries where the pest is present
 (Canada, United States of America): 49 144 kg (median 2016-2025). Imports from other countries are
 not counted. ... upper bound.
-Basis: EPPO host commodities: ...; host genera: Betula.
+Basis: EPPO host commodities: ...; hosts: Betula.
 
 Largest CN8 lines (median kg per year, share of total, kg in total):
 lastepaller, kassepaller og andre paller av tre; pallekarmer (44152000): 32 526 kg per year (66%, mixed line), 327 671 kg in total 2016-2025
@@ -141,14 +153,15 @@ Vedlegg 3, nr. 11: <one sentence>
 Note: ...
 ```
 
-R fills in the class, the numbers, the CN8 codes and the notes. The LLM (OpenAI `gpt-5.5-2026-04-23` by default) writes one English sentence per regulation unit: first the units naming the pest, then the origin rules. Each line must start with an id shown in Panel 3; otherwise the unit's own text is shown instead. The result is cached per set of units and model, and Regenerate bypasses the cache.
+R fills in the class, the numbers, the CN8 codes and the notes. The LLM (OpenAI `gpt-5.4-mini-2026-03-17` by default, a small model: the task is short) writes one English sentence per regulation unit: first the units naming the pest, then the origin rules. Each line must start with an id shown in Panel 3; otherwise the unit's own text is shown instead. The result is cached per set of units and model, and Regenerate bypasses the cache.
 
 ## Read the results with care
 * Import statistics show **recorded trade**, not pest pressure or entry.
 * Only trade from countries where EPPO records the pest as present is counted. Countries missing from the EPPO distribution, and goods re-exported through third countries, are not covered.
 * CN8 lines cover whole commodity groups, so the class is an **upper bound** for the host-specific volume. The CN8 line table helps judge how much of it matters.
 * Wood packaging mostly travels with other goods and has no SSB line. Manufactured articles are counted only as casks and prefabricated wooden buildings. Soil has no CN line.
-* Seeds, food and fodder, and other plant parts are listed for manual assessment.
+* Food and fodder counts only fresh or chilled products. Seeds are in kg, not pieces. Stored products and pollen have no customs code.
+* "Not elsewhere specified" codes (other vegetables, other fruit, other seeds) count for hosts without a code of their own, so exotic hosts can get several of them.
 
 ## Data sources
 | Source | Access | Cache |
@@ -169,12 +182,13 @@ The cache lives in `cache/`, which is git-ignored. Fetch dates are shown in the 
 * the LLM provider and model, the language, and cache lifetimes.
 
 Lookup tables are in `data/`:
-* `commodity_cn8.csv`: CN8 lines;
+* `commodity_cn8.csv`: CN8 lines (built by `dev/build_commodity_cn8.R`);
+* `cn8_host_taxa.csv`: the crop-name table, code pattern -> pathway, Norwegian words, host taxa (EPPO names);
 * `eppo_commodity_map.csv`: EPPO category to FinnPRIO pathway;
 * `finnprio_thresholds.csv`;
 * `country_map.csv`: SSB country codes that are not ISO2;
 * `law_taxon_aliases.csv`: taxon names as the regulation writes them;
-* `genus_names_no.csv`: Norwegian host names from the tariff.
+* `genus_names_no.csv`: Norwegian host names from the tariff and the crop-name table (for the host search).
 
 ## Project layout
 ```
@@ -191,6 +205,7 @@ R/prompts.R, llm_provider.R   write-up layout, regulation prompt, checks, LLM ca
 R/mod_*.R                 Shiny modules for input and panels 1-4
 data/                     lookup tables (see Configuration)
 dev/build_commodity_cn8.R builds data/commodity_cn8.csv and data/genus_names_no.csv
+dev/check_host_taxa.R    checks the Latin names in data/cn8_host_taxa.csv against EPPO
 dev/record_eppo_fixtures.R  records EPPO responses for the tests
 dev/deploy.R, write_manifest.R  deployment to Posit Connect Cloud
 docs/                     vignette, decisions, findings, reference copies (EPPO user guide, tariff)

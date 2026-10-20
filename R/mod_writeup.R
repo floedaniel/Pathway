@@ -48,8 +48,9 @@ mod_writeup_server <- function(id, result, pathways, settings) {
       lapply(pathways(), function(p) {
         box_id <- session$ns(paste0("text_", p))
         head <- shiny::tags$label(class = "fw-semibold", `for` = box_id, pathway_label(p))
-        if (pathway_type(p) == "manual") {
-          return(shiny::div(class = "mb-3", head, shiny::p(class = "text-muted", "Assess manually (not computed in v1).")))
+        if (is.null(pinfo(result(), p))) {
+          return(shiny::div(class = "mb-3", head, shiny::p(class = "text-muted",
+            "Assess manually: EPPO lists a commodity of this pathway that has no customs code in the app (e.g. stored products, pollen).")))
         }
         x <- w[[p]]
         if (is.null(x)) {

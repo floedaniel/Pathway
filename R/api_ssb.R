@@ -98,11 +98,19 @@ read_commodity_cn8 <- function(file = "data/commodity_cn8.csv") {
 # CN8 lines for a pathway and a set of groups ("both" lines belong to every group).
 # "monocot" lines (0601 bulbs, tubers) join non_conifer only when monocot = TRUE,
 # i.e. at least one host is a monocot.
-# host_genera: named list per group (conifer, non_conifer) of host genera, or NULL
-# for no genus filter (also used for a group with a host known only above genus).
-# A genus-specific line (column `genus`, e.g. birch round wood) counts only when a
-# host of its group is in that genus; a residual line (`excludes_genera`, e.g.
-# "other broadleaved") counts only when a host genus of its group is outside the list.
+# host_genera: named list per group (conifer, non_conifer) of hosts, or NULL for no
+# host filter (also used for a group with a host known only above genus). Each host
+# is list(taxa, rank): its EPPO name and lineage names from family down (see
+# classify_host()). A plain character vector of genus and family names is also
+# accepted (each genus one host, the families attached to all).
+# Line columns (names are EPPO preferred names, checked by dev/check_host_taxa.R):
+# - `genus`: taxa the line covers (genus, species or family, e.g. birch round wood
+#   "Betula", tomatoes "Solanum lycopersicum", orchids "Orchidaceae"); the line counts
+#   when a host belongs to one of them, or when a genus-level host contains one.
+# - `excludes_genera`: a residual line ("other broadleaved", "other Allium"); it
+#   counts when some host (within `genus`, if set) is not covered by the list. "*"
+#   = residual of the pathway ("vegetables n.e.s."): counts for hosts that no
+#   specific line of the pathway covers.
 # categories: EPPO host-commodity categories listed for the pest (NULL = no filter);
 # a line counts only when one of its `eppo_category` values is listed.
 cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera = NULL, categories = NULL) {
@@ -115,22 +123,51 @@ cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera =
   }
   x <- cn8_table[cn8_table$pathway == pathway & keep, ]
   if (is.null(host_genera) || nrow(x) == 0) return(x)
-  split_genera <- function(s) if (is.na(s) || !nzchar(s)) character() else strsplit(s, ";")[[1]]
+  host_genera <- lapply(host_genera, as_hosts)
+  split_taxa <- function(s) if (is.na(s) || !nzchar(s)) character() else norm_taxon(strsplit(s, ";")[[1]])
+  only_all <- lapply(x$genus %||% rep(NA, nrow(x)), split_taxa)
+  excl_all <- lapply(x$excludes_genera %||% rep(NA, nrow(x)), split_taxa)
+  # "*" lines: a host is covered when another line of the pathway names its taxa.
+  # A scoped "*" line (with taxa, e.g. 'vegetable seeds n.e.s.') yields only to
+  # lines that are not "*"; an unscoped one ('seeds n.e.s.') also to scoped ones.
+  star <- vapply(excl_all, identical, logical(1), "*")
+  covered_by_specific <- function(h, i) {
+    others <- setdiff(which(lengths(only_all) > 0), i)
+    if (length(only_all[[i]]) > 0) others <- others[!star[others]]
+    any(vapply(others, function(j) host_in(h, only_all[[j]]), logical(1)))
+  }
   ok <- vapply(seq_len(nrow(x)), function(i) {
     grp <- x$commodity_group[i]
     # "both" / "monocot" lines: judged on the hosts of all requested groups
     use <- if (grp %in% c("conifer", "non_conifer")) grp else intersect(c("conifer", "non_conifer"), groups)
     use <- intersect(use, names(host_genera))
     if (length(use) == 0 || any(vapply(host_genera[use], is.null, logical(1)))) return(TRUE)
-    hg <- unlist(host_genera[use])
-    only <- split_genera(x$genus[i])
-    excl <- split_genera(x$excludes_genera[i])
-    if (length(only) > 0) return(any(hg %in% only))
-    # residual lines: judged on genera only (family names end in -aceae)
-    if (length(excl) > 0) return(any(!hg[!grepl("aceae$", hg)] %in% excl))
-    TRUE
+    hosts <- unlist(host_genera[use], recursive = FALSE)
+    only <- only_all[[i]]
+    excl <- excl_all[[i]]
+    if (length(only) > 0) hosts <- Filter(function(h) host_in(h, only), hosts)
+    if (identical(excl, "*")) return(any(!vapply(hosts, covered_by_specific, logical(1), i = i)))
+    if (length(excl) > 0) return(any(vapply(hosts, function(h) !any(h$taxa %in% excl), logical(1))))
+    length(only) == 0 || length(hosts) > 0
   }, logical(1))
   x[ok, ]
+}
+
+# Taxon names compared without the hybrid sign ("Citrus x limon" = "Citrus limon",
+# "x Citrofortunella" = "Citrofortunella").
+norm_taxon <- function(x) trimws(gsub("\\s+", " ", gsub("(^|\\s)[x×]\\s", "\\1", x)))
+genus_of <- function(x) sub(" .*$", "", norm_taxon(x))
+
+# Is host h (list(taxa, rank)) within one of `taxa`? Yes when one of its lineage
+# names is listed, or, for a genus-level host, when a listed species is in its genus.
+host_in <- function(h, taxa) any(h$taxa %in% taxa) || (identical(h$rank, "Genus") && any(genus_of(taxa) %in% h$taxa))
+
+# Hosts of one group in the form cn8_lines() uses.
+as_hosts <- function(x) {
+  if (is.null(x)) return(x)
+  if (is.list(x)) return(lapply(x, function(h) list(taxa = norm_taxon(h$taxa), rank = h$rank)))
+  fam <- x[grepl("aceae$", x)]
+  lapply(setdiff(x, fam), function(g) list(taxa = norm_taxon(c(g, fam)), rank = "Genus"))
 }
 
 # CN8 lines for a pathway from its host selection `info` (see pathway_info() in
@@ -139,16 +176,21 @@ pathway_lines <- function(cn8_table, pathway, info, group = NULL) {
   cn8_lines(cn8_table, pathway, group %||% info$groups, isTRUE(info$monocot), info$host_genera, info$categories)
 }
 
-# Host genera (and their families, for lines that name a family such as palms)
-# per group for cn8_lines(); NULL for a group where some host has no genus in its
-# lineage (e.g. a family-level host), so that group is not filtered.
+# Hosts per group for cn8_lines(), each list(taxa, rank) from the EPPO taxonomy
+# (classify_host()); without that, genus and family. NULL for a group where some
+# host has no genus in its lineage (e.g. a family-level host), so that group is not
+# filtered.
 host_genera_by_group <- function(classified) {
   if (any(classified$host_class == "all_plants")) return(list(conifer = NULL, non_conifer = NULL))
   out <- lapply(c(conifer = "conifer", non_conifer = "non_conifer"), function(g) {
-    sel <- classified$host_class == g
-    gen <- classified$genus[sel]
-    if (length(gen) == 0) return(character())
-    if (anyNA(gen)) NULL else unique(stats::na.omit(c(gen, classified$family[sel])))
+    sel <- which(classified$host_class == g)
+    if (length(sel) == 0) return(list())
+    if (anyNA(classified$genus[sel])) return(NULL)
+    lapply(sel, function(i) {
+      t <- if (!is.null(classified$taxa) && !is.na(classified$taxa[i]) && nzchar(classified$taxa[i]))
+        strsplit(classified$taxa[i], ";")[[1]] else stats::na.omit(c(classified$genus[i], classified$family[i]))
+      list(taxa = norm_taxon(unique(t)), rank = classified$rank[i] %||% "Genus")
+    })
   })
   out[!vapply(out, function(x) !is.null(x) && length(x) == 0, logical(1))]
 }

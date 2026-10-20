@@ -41,18 +41,23 @@ test_that("AGRLAX: plants for planting and wood, from Betula only", {
   expect_equal(names(pc$info), c("plants_for_planting", "wood"))
   expect_setequal(pc$info$wood$categories, c("squared wood", "non-squared wood", "bark",
                                              "manufactured articles", "packaging material"))
-  expect_equal(pc$info$wood$host_genera$non_conifer, c("Betula", "Betulaceae"))
+  expect_equal(pc$info$wood$host_genera$non_conifer, list(list(taxa = c("Betulaceae", "Betula"), rank = "Genus")))
   expect_equal(pc$info$wood$groups, "non_conifer")
   expect_length(pc$manual, 0)
 })
 
-test_that("IPSXCA: wood is non-squared only; cut flowers or branches is a manual pathway", {
+test_that("IPSXCA: wood is non-squared only; cut flowers or branches are computed (other plant parts)", {
   local_eppo_mock()
   s <- test_settings()
   withr::local_dir(root)
   pc <- pathways_from_commodities(parse_host_commodities(gd_page("IPSXCA")), s)
   expect_equal(pc$info$wood$categories, "non-squared wood")
-  expect_equal(pc$manual, "other_plant_parts")
+  expect_length(pc$manual, 0)
+  expect_equal(pc$info$other_plant_parts$categories, "cut flowers or branches")
+  o <- pathway_lines(cn8_table, "other_plant_parts", pc$info$other_plant_parts)
+  expect_true("06042092_2012" %in% o$cn8)                # Christmas trees (conifer host)
+  expect_true("06042099_2015" %in% o$cn8)                # foliage and branches n.e.s.
+  expect_false(any(startsWith(o$cn8, "060311")))         # no roses
   w <- pathway_lines(cn8_table, "wood", pc$info$wood)
   expect_true("44032111_2017" %in% w$cn8)                # pine round wood
   expect_false(any(startsWith(w$cn8, "4407")))           # no sawn timber (squared wood)

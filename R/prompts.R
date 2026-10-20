@@ -37,11 +37,16 @@ fmt_share <- function(x) ifelse(is.na(x), "-", ifelse(x > 0 & x < 0.01, "<1%", p
 
 pathway_scope <- function(pathway, lines) {
   chapters <- unique(substr(cn8_code(lines$cn8), 1, 4))
-  if (pathway == "plants_for_planting") {
-    paste0("plants for planting (CN ", paste(sort(intersect(chapters, c("0601", "0602"))), collapse = ", "), ")")
-  } else {
-    paste0("wood (CN 44", if ("9406" %in% chapters) ", 9406.10" else "", ")")
-  }
+  switch(pathway,
+    plants_for_planting = paste0("plants for planting (CN ", paste(c(sort(intersect(chapters, c("0601", "0602"))),
+                                                                   if ("0701" %in% chapters) "0701 10"), collapse = ", "), ")"),
+    wood = paste0("wood (CN 44", if ("9406" %in% chapters) ", 9406.10" else "", ")"),
+    food_fodder = paste0("fresh or chilled fruits and vegetables (CN ",
+                         paste(c(if (any(startsWith(chapters, "07"))) "07", if (any(startsWith(chapters, "08"))) "08"), collapse = ", "), ")"),
+    other_plant_parts = paste0("fresh cut flowers and foliage (CN ", paste(sort(intersect(chapters, c("0603", "0604"))), collapse = ", "), ")"),
+    seeds = paste0("seeds for sowing (CN ", paste(c(if (any(startsWith(chapters, "10"))) "10", if ("1209" %in% chapters) "12 09"),
+                                                  collapse = ", "), ")"),
+    pathway)
 }
 
 # Deterministic inputs for one pathway: CN8 line summary, every pest-present country
@@ -59,9 +64,22 @@ writeup_inputs <- function(r, pathway, cn8_table = read_commodity_cn8()) {
   )
 }
 
+# Do all lines with imports name host taxa (no mixed or residual line)?
+all_host_specific <- function(lines_used, ls) {
+  if (is.null(lines_used) || !"genus" %in% names(lines_used) || is.null(ls) || nrow(ls) == 0) return(FALSE)
+  used <- lines_used[lines_used$cn8 %in% ls$cn8[ls$kg_total > 0], ]
+  ex <- used$excludes_genera %||% rep("", nrow(used))
+  nrow(used) > 0 && all(!is.na(used$genus) & nzchar(used$genus %||% "") & (is.na(ex) | !nzchar(ex)) &
+                          !grepl("aceae(;|$)", used$genus))
+}
+
 # A line that also covers species other than the host: flagged upper_bound and not
-# naming a host genus (a genus-specific line such as sawn birch is not mixed).
-mixed_line <- function(flags, genus = NA) grepl("upper_bound", flags %||% "") & (is.na(genus) | !nzchar(genus))
+# naming host taxa, or a residual line ("other Allium"); a genus-specific line such
+# as sawn birch is not mixed.
+mixed_line <- function(flags, genus = NA, excludes = NA) {
+  grepl("upper_bound", flags %||% "") &
+    (is.na(genus) | !nzchar(genus) | (!is.na(excludes) & nzchar(excludes %||% "")))
+}
 
 # Lovdata units the regulation section covers: units naming the pest, then
 # origin rules (host genus + pest-present country).
@@ -90,9 +108,11 @@ writeup_text <- function(r, pathway, inputs, regulation) {
             else paste0(fmt_mass(ent3$kg), " (", ent3$stat, " ", ent3$years, ")")
   out <- c(out, paste0("Annual import into Norway of ", pathway_scope(pathway, inputs$lines_used), " from ", where, ": ",
                        amount, ". Imports from other countries are not counted.",
-                       if ("NO" %in% r$present_countries) " The pest is also present in Norway.", " The figure covers all ",
-                       if (pathway == "wood") "products" else "plants", " in these CN lines, not only host ",
-                       if (pathway == "wood") "commodities" else "plants", ", so it is an upper bound."))
+                       if ("NO" %in% r$present_countries) " The pest is also present in Norway.",
+                       if (all_host_specific(inputs$lines_used, inputs$lines)) " These CN lines name the host commodities only."
+                       else paste0(" The figure covers all ", if (pathway == "plants_for_planting") "plants" else "products",
+                                   " in these CN lines, not only host ", if (pathway == "plants_for_planting") "plants" else "commodities",
+                                   ", so it is an upper bound.")))
   basis <- if (!is.null(r$pathway_info)) pathway_basis(pathway, r) else NULL
   out <- c(out, if (!is.null(basis)) basis, "")
 
@@ -107,7 +127,7 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   if (!is.null(top) && nrow(top) > 0) {
     out <- c(out, "Largest CN8 lines (median kg per year, share of total, kg in total):",
              paste0(label_of(top$cn8), "(", top$code, "): ", fmt_mass(top$kg), " per year (", fmt_share(top$share),
-                    ifelse(mixed_line(top$flags, top$genus %||% NA), ", mixed line", ""), "), ", fmt_mass(top$kg_total),
+                    ifelse(mixed_line(top$flags, top$genus %||% NA, top$excludes %||% NA), ", mixed line", ""), "), ", fmt_mass(top$kg_total),
                     " in total ", ent3$years), "")
   }
 
@@ -177,8 +197,7 @@ regulation_fallback <- function(units) {
 # + model; `nonce` changes the cache key (Regenerate). One retry, then the
 # fallback. Returns list(text, source, problems).
 generate_writeup <- function(r, pathway, settings, ask = llm_ask, nonce = 0, inputs = NULL) {
-  if (pathway_type(pathway) == "manual") return(list(text = "", source = "manual", problems = character()))
-  if (is.null(inputs) && is.null(pinfo(r, pathway))) return(list(text = "", source = "not listed", problems = character()))
+  if (is.null(inputs) && is.null(pinfo(r, pathway))) return(list(text = "", source = "manual", problems = character()))
   if (is.null(inputs)) inputs <- writeup_inputs(r, pathway)
   units <- regulation_units(r)
   if (is.null(units) || nrow(units) == 0) {

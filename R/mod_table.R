@@ -94,7 +94,8 @@ line_summary <- function(imports, lines, stat_years, total_kg) {
     l <- lines[i, ]
     q <- annual_totals(imports, l, stat_years)$quantity
     tibble::tibble(cn8 = l$cn8, code = cn8_code(l$cn8), description = cn8_text(l), flags = l$flags,
-                   genus = l$genus %||% NA_character_, kg = stats::median(q), kg_total = sum(q))
+                   genus = l$genus %||% NA_character_, excludes = l$excludes_genera %||% NA_character_,
+                   kg = stats::median(q), kg_total = sum(q))
   })
   out <- dplyr::bind_rows(rows)
   if (nrow(out) == 0) return(out)
@@ -154,7 +155,25 @@ pathway_notes <- function(pathway, r) {
       n <- c(n, if (isTRUE(info$monocot)) "Bulbs, tubers, corms and rhizomes (CN 0601) are included because at least one host is a monocot."
                 else "Bulbs and tubers (CN 0601) are not included: no monocot host. Dicot bulbs and tubers (e.g. Dahlia, Paeonia) are missed.")
     }
+    if (any(grepl("^070110", pathway_lines(read_commodity_cn8(), pathway, info)$cn8)))
+      n <- c(n, "Seed potatoes (CN 0701 10) are included because a host is potato.")
     n <- c(n, "Soil associated with host plants belongs to this pathway but has no CN line.")
+  }
+  if (pathway == "food_fodder") {
+    n <- c(n, "Only fresh or chilled products are counted; frozen, dried and processed products are not.",
+           "Lines for products 'not elsewhere specified' (e.g. other vegetables, other fruit) count for hosts without a line of their own; they are an upper bound.")
+    if ("stored products" %in% (r$commodities$category %||% character()))
+      n <- c(n, "EPPO also lists stored products for this pest; they are not counted (not fresh or chilled).")
+  }
+  if (pathway == "other_plant_parts") {
+    n <- c(n, "Only fresh cut flowers, foliage and branches (CN 0603, 0604 20) are counted; dried or treated ones are not.",
+           "Fresh foliage and branches n.e.s. (0604 20 99) count for any host; Christmas trees (0604 20 92) for fir, spruce, pine and Douglas fir.")
+    if ("pollen" %in% (r$commodities$category %||% character()))
+      n <- c(n, "EPPO also lists pollen for this pest; it has no customs code.")
+  }
+  if (pathway == "seeds") {
+    n <- c(n, "Seeds are counted in kg (FinnPRIO assesses seeds in pieces; kg by decision).",
+           "Seed lines 'not elsewhere specified' (e.g. other vegetable seeds, which include tomato and pepper seed) count for hosts without a line of their own.")
   }
   if (pathway == "wood") {
     n <- c(n, "Genus-specific wood lines (e.g. birch, oak, pine) count only for host genera; mixed lines (firewood, chips, waste, packaging) are an upper bound.")
@@ -163,6 +182,12 @@ pathway_notes <- function(pathway, r) {
     if ("manufactured articles" %in% cats) n <- c(n, "Manufactured articles: only casks (4416) and prefabricated wooden buildings (9406.10) are counted; other manufactured wood is not.")
   }
   n
+}
+
+# Host names of a pathway as EPPO lists them (e.g. "Betula", "Solanum lycopersicum").
+host_names <- function(info) {
+  sort(unique(stats::na.omit(ifelse(info$hosts$host_class == "all_plants", "all plants",
+                                    info$hosts$prefname %||% info$hosts$genus))))
 }
 
 # One line under the pathway heading: what the CN8 lines are based on.
@@ -174,8 +199,8 @@ pathway_basis <- function(pathway, r) {
   if (is.null(info$categories)) {
     paste0("Basis: host plants (", length(unique(info$hosts$eppocode)), " Major host / Host records).")
   } else {
-    paste0("Basis: EPPO host commodities: ", paste(info$categories, collapse = ", "), "; host genera: ",
-           paste(genera, collapse = ", "), ".")
+    paste0("Basis: EPPO host commodities: ", paste(info$categories, collapse = ", "), "; hosts: ",
+           paste(host_names(info), collapse = ", "), ".")
   }
 }
 
@@ -190,9 +215,16 @@ origins_text <- function(r) {
 # Does a customs code cover only the host? Yes when the code names a host genus
 # (column `genus`, e.g. sawn birch); otherwise it also covers other species
 # (pallets, broadleaved firewood, all trees and shrubs ...). Bark status is added.
-host_only_text <- function(genus, flags) {
+host_only_text <- function(genus, flags, excludes = "") {
   g <- !is.na(genus) & nzchar(genus %||% "")
-  out <- ifelse(g, paste0("Yes (", gsub(";", ", ", genus), ")"), "No, also other species")
+  # residual codes ("other Allium") and family-level codes cover other species too
+  mixed <- (!is.na(excludes) & nzchar(excludes %||% "")) | grepl("aceae(;|$)", genus %||% "")
+  short <- vapply(strsplit(as.character(ifelse(g, genus, "")), ";"), function(t)
+    if (length(t) > 3) paste0(paste(t[1:3], collapse = ", "), " ...") else paste(t, collapse = ", "), "")
+  star <- !is.na(excludes) & excludes %in% "*"
+  out <- ifelse(g & !mixed, paste0("Yes (", short, ")"),
+                ifelse(star, "Partly (not elsewhere specified)",
+                       ifelse(g, paste0("Partly (", short, ", also other species)"), "No, also other species")))
   extra <- ifelse(grepl("with_bark", flags %||% ""), ", with bark", ifelse(grepl("debarked", flags %||% ""), ", debarked", ""))
   paste0(out, extra)
 }
@@ -226,7 +258,7 @@ based_on <- function(p, r) {
   info <- pinfo(r, p)
   genera <- sort(unique(stats::na.omit(ifelse(info$hosts$host_class == "all_plants", "all plants", info$hosts$genus))))
   if (is.null(info$categories)) paste0("host plants (EPPO lists no host commodities): ", paste(genera, collapse = ", "))
-  else paste0("EPPO host commodities: ", paste(info$categories, collapse = ", "), " of ", paste(genera, collapse = ", "))
+  else paste0("EPPO host commodities: ", paste(info$categories, collapse = ", "), " of ", paste(host_names(info), collapse = ", "))
 }
 
 # All numbers for one computed pathway: the ENT3 row, per-country and per-code
@@ -259,7 +291,8 @@ pathway_tables <- function(p, r, cn8_table, settings) {
   m <- match(code$key, lines$cn8)
   code$label <- cn8_short(lines)[m]
   code$text <- cn8_text(lines)[m]
-  code$host_only <- host_only_text(lines$genus[m] %||% rep(NA, length(m)), lines$flags[m])
+  code$host_only <- host_only_text(lines$genus[m] %||% rep(NA, length(m)), lines$flags[m],
+                                   lines$excludes_genera[m] %||% rep("", length(m)))
   origins <- origin_countries(r)
   years_any <- sum(annual_totals(r$imports, lines, stat_years)$quantity > 0)
   list(ent3 = r$classes[r$classes$pathway == p & r$classes$role == "ent3", ],
@@ -374,7 +407,7 @@ host_search_ui <- function(r) {
 
 panel1_ui <- function(r, sel, cn8_table, settings) {
   computed <- intersect(sel, names(r$pathway_info))
-  manual <- setdiff(sel[pathway_type(sel) == "manual"], computed)
+  manual <- setdiff(sel, computed)  # EPPO category without CN lines (stored products, pollen)
   tabs <- stats::setNames(lapply(computed, pathway_tables, r = r, cn8_table = cn8_table, settings = settings), computed)
   shiny::tagList(
     summary_ui(r, tabs, manual),

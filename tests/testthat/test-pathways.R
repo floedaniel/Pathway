@@ -4,7 +4,8 @@ law_fixture_idx <- function(settings) law_parse(law_fixture)
 
 test_that("pathways: FinnPRIO ids, without hitchhiking / natural spread / intentional introduction", {
   expect_setequal(finnprio_pathways$id, c("plants_for_planting", "wood", "seeds", "food_fodder", "other_plant_parts"))
-  expect_setequal(computed_pathways, c("plants_for_planting", "wood"))
+  expect_setequal(computed_pathways, finnprio_pathways$id)          # all five computed (decision 56)
+  expect_setequal(fallback_pathways, c("plants_for_planting", "wood"))  # without an EPPO list
 })
 
 test_that("an empty selection is blocked", {

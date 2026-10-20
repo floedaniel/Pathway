@@ -38,9 +38,16 @@ classify_host <- function(tax) {
   } else {
     "not_plant"
   }
+  # Taxa for matching CN8 lines (decided 2026-10-20, user: use the EPPO taxonomy):
+  # the host's own EPPO name and every lineage name from family down
+  # (family, subfamily, genus, species), ";"-separated; rank = the host's own rank.
+  fam <- match("Family", tax$type)
+  taxa <- if (is.na(group) && nrow(tax) > 0) tax$prefname[if (is.na(fam)) nrow(tax) else seq(fam, nrow(tax))] else character()
   tibble::tibble(family = lineage_rank(tax, "Family"), genus = lineage_rank(tax, "Genus"),
                  host_class = host_class,
-                 monocot = host_class == "non_conifer" && any(tax$prefname %in% monocot_taxa))
+                 monocot = host_class == "non_conifer" && any(tax$prefname %in% monocot_taxa),
+                 taxa = paste(taxa, collapse = ";"),
+                 rank = if (nrow(tax) > 0 && is.na(group)) utils::tail(tax$type, 1) else NA_character_)
 }
 
 # hosts: tibble from eppo_selected_hosts(). Returns hosts with lineage and host_class.

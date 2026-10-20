@@ -193,7 +193,7 @@ https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
   - Plants for planting (vedlegg 5A nr. 1): all 30 0602 lines count for non_conifer; the 5 catch-all lines (06021029, 06029010, 06029021, 06029059, 06029098) also count for conifer, flagged `upper_bound;conifer_catch_all`. UI warning: "Conifer plants for planting only appear in catch-all lines. Class is a loose upper bound."
   - Wood (vedlegg 5A nr. 8, matched on wording, not on the old tariff numbers): firewood, chips/spon, sawdust and wood waste, round wood, split posts, untreated sleepers, sawn timber > 6 mm, wooden packaging and pallets, oak casks, prefabricated wooden buildings. 102 lines. Out: tropical wood, eucalyptus round wood, agglomerated wood, impregnated/treated wood. Non-conifer and unsplit wood lines are flagged `upper_bound`.
   - Bark: with-bark subtotal shown as information only (flags `with_bark` / `debarked`), not ENT3.
-- Test pests (live): conifer IPSXCA, DENCPO, POLGPR; non_conifer AROMBU, CERAFP, LYMAMA; both GIBBCI, PHYTRA, XYLEFA. PHYTIN (potato only) has no present-country records in EPPO, so it is the "no distribution" test. Still to add: one pest where Class A and B differ (narrow distribution).
+- Test pests (live): conifer IPSXCA, DENCPO, POLGPR; non_conifer AROMBU, CERAFP, LYMAMA; both GIBBCI, PHYTRA, XYLEFA. PHYTIN (potato only) has no present-country records in EPPO, so it is the "no distribution" test. Class A != B case: IPSXCA (A large, B small).
 - HF models: decide at Step 11 from the router's `/v1/models` (Llama-3.3-70B-Instruct, a large Qwen instruct, NorMistral if served). Ollama is installed locally, also an option.
 - EPPO key: `API_kays/EPPO_beta.txt` (folder is git-ignored). Startup check stays.
 - Push: origin is HTTPS, pushes work.
@@ -212,6 +212,12 @@ https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
 - Vedlegg 2 lists host genera per pest; vedlegg 3 and 4A list origin-specific bans. The search matches pest names and host genera.
 - Finer data exist in principle: Mattilsynet holds genus-level import data from consignment notifications (§ 23a) and certificates (§ 20). A data request, not v1.
 
+## Findings from the first end-to-end runs (2026-10-20, Steps 6-7)
+- Pipeline `run_assessment()` (R/pipeline.R): EPPO -> hosts -> groups -> present countries -> SSB 2016-2025 -> classes for both pathways -> Lovdata. ~30 s cold, seconds when cached.
+- IPSXCA: conifer. Wood kg: Class A large (median 1.26 billion kg/yr), Class B small (0.43 million kg from pest-present origins). Plants for planting kg: A large (17.8 million kg, catch-all lines), B small. Good A != B case for the tests.
+- AROMBU: non_conifer. Plants for planting kg: A large, B medium. Wood kg: A and B large.
+- Wood is classified in kg only; its Q2 pieces come only from pallets/crates, so no pc class for wood.
+- Classes for the catch-all and non-conifer lines are loose upper bounds, as expected (most are `large`).
+
 ## Open questions for me
 1. **Bulbs and tubers (0601).** Vedlegg 5A nr. 1 covers all plants and propagating material, and non_conifer now includes herbaceous plants. Should 0601 (bulbs, tubers, corms, rhizomes) join plants for planting, or stay out of v1?
-2. **Pest where Class A and B differ.** Suggest one from master_species.xlsx with a narrow distribution, or should I pick one once SSB data are in (Step 6)?

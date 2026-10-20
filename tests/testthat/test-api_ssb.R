@@ -2,7 +2,7 @@ cn8_table <- read_commodity_cn8(file.path(root, "data", "commodity_cn8.csv"))
 
 fake_meta <- function(q1 = "kg") {
   list(cn8 = tibble::tibble(cn8 = c("06029098_2016", "44071221_2022", "44151000_2001"),
-                            label = "", q1_unit = c("kg", q1, "kg"), q2_unit = c("stk", "m³", "stk")),
+                            label = "", q1_unit = c("kg", q1, "kg")),
        years = 1988:2025, countries = c(DE = "Tyskland"), updated = "2026-05-15")
 }
 
@@ -32,20 +32,19 @@ test_that("window is ssb_years back from the latest complete year", {
 test_that("unit other than kg stops", {
   lines <- data.frame(cn8 = "44071221_2022", commodity_group = "conifer")
   expect_error(ssb_check_units(lines, fake_meta(q1 = "m³")),
-               "Unit mismatch for conifer: SSB m³, expected kg or pc.", class = "pathwise_stop_unit_mismatch")
+               "Unit mismatch for conifer: SSB m³, expected kg.", class = "pathwise_stop_unit_mismatch")
 })
 
-test_that("imports are chunked, cached, and pc is kept only for stk lines", {
+test_that("imports are chunked and cached; kg only", {
   s <- test_settings()
   calls <- 0
   fake_fetch <- function(cn8, years) {
     calls <<- calls + 1
-    tibble::tibble(cn8 = cn8, country = "DE", year = 2025L, kg = 10, value_nok = 100, pc = 5)
+    tibble::tibble(cn8 = cn8, country = "DE", year = 2025L, kg = 10, value_nok = 100)
   }
   lines <- data.frame(cn8 = c("06029098_2016", "44071221_2022"), commodity_group = "conifer")
   x <- ssb_imports(lines, 2016:2025, s, meta = fake_meta(), fetch_chunk = fake_fetch)
-  expect_equal(x$pc[x$cn8 == "06029098_2016"], 5)
-  expect_true(is.na(x$pc[x$cn8 == "44071221_2022"]))
+  expect_equal(names(x), c("cn8", "country", "year", "kg", "value_nok"))
   ssb_imports(lines, 2016:2025, s, meta = fake_meta(), fetch_chunk = fake_fetch)
   expect_equal(calls, 1)
 })

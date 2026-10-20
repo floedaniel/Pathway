@@ -92,7 +92,7 @@ out <- rbind(plants, wood)
 out$notes <- ""
 out$reviewed <- ""
 out <- out[, c("pathway", "cn8", "description", "commodity_group", "flags", "source",
-               "valid_from", "valid_to", "q2_unit", "notes", "reviewed")]
+               "valid_from", "valid_to", "notes", "reviewed")]
 write.csv(out, "data/commodity_cn8.csv", row.names = FALSE, na = "", fileEncoding = "UTF-8")
 print(table(out$pathway, out$commodity_group))
 excluded <- d[!is.na(entry) & !wood_sel, c("cn8", "description")]

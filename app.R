@@ -1,5 +1,6 @@
 # Pathwise: pest import risk (FinnPRIO ENT3) from a single EPPO code.
 library(shiny)
+library(config)
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(f)
 
@@ -46,16 +47,15 @@ ui <- bslib::page_sidebar(
 server <- function(input, output, session) {
   inp <- mod_input_server("input", settings)
 
-  # Run computes both data pathways (cached) plus the selected fixed ones, so the
-  # pathway selection can change afterwards without a new run.
+  # Run computes both data pathways (cached), so the pathway selection can change
+  # afterwards without a new run.
   result <- eventReactive(inp$run(), {
     code <- inp$code()
     req(nzchar(code))
     withProgress(message = paste("Running", code), value = 0.3, {
       tryCatch({
         validate_pathways(inp$pathways())
-        fixed <- inp$pathways()[pathway_type(inp$pathways()) == "fixed"]
-        run_assessment(code, settings, pathways = c(computed_pathways, fixed), cn8_table = cn8_table)
+        run_assessment(code, settings, pathways = computed_pathways, cn8_table = cn8_table)
       }, pathwise_stop = function(e) e, pathwise_api_error = function(e) e)
     })
   })
@@ -66,8 +66,7 @@ server <- function(input, output, session) {
     if (is.list(r) && !inherits(r, "condition")) inp$preselect(r$groups)
   })
 
-  # Pathways shown: the selection, capped at FinnPRIO's limit
-  shown_pathways <- reactive(utils::head(inp$pathways(), max_pathways))
+  shown_pathways <- reactive(inp$pathways())
 
   output$has_result <- reactive(is.list(result()) && !inherits(result(), "condition"))
   outputOptions(output, "has_result", suspendWhenHidden = FALSE)

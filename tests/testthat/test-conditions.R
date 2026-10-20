@@ -7,7 +7,7 @@ test_that("stop_app signals a typed, catchable condition", {
 
 test_that("every stop type has a message, and fields are filled", {
   expect_error(stop_app("unit_mismatch", group = "conifer", unit = "m3"),
-               "Unit mismatch for conifer: SSB m3, expected kg or pc.", fixed = TRUE)
+               "Unit mismatch for conifer: SSB m3, expected kg.", fixed = TRUE)
   expect_error(stop_app("no_plant_hosts"), "No plant hosts among the selected EPPO hosts.", fixed = TRUE)
 })
 

@@ -40,3 +40,12 @@ Supersedes items 1, 14 and 17 above.
 24. **Class A per pathway** is the total over the union of the pathway's host commodity lines (`all_hosts`, role `ent3`); conifer / non_conifer rows are information.
 25. **0601 bulbs and tubers** belong to plants_for_planting and count only when a host is a monocot (EPPO category Basal monocotyledons or Commelinids). UI notes that dicot bulbs/tubers are missed and that soil has no CN line. Wood: bark is part of the pathway (wood waste lines); UI warns that CN 4415 captures only packaging traded as goods.
 26. **Keys.** Env vars win; otherwise the app reads the git-ignored `API_kays/` folder (supersedes item 8's "never read from key files").
+
+## 2026-10-20 (later): simplifications
+Supersedes items 22-25 where they conflict.
+
+27. **No fixed pathways.** Hitchhiking, natural spread and intentional introduction are removed from the app. Pathways: plants_for_planting, wood (computed); seeds, food_fodder, other_plant_parts (assess manually). No 5-pathway limit needed.
+28. **kg only.** Pieces (pc) removed everywhere: no Q2 in SSB queries, no pc thresholds, no pc classes.
+29. **Class B replaced.** A class for pest-present origins looked like an ENT3 answer although it is not one. Panel 1 now shows imports from pest-present origins as kg and share of the total (context only, no class).
+30. **Tidy Panel 1, median only.** One value per column: host commodities | median kg/year (all origins) | ENT3 class | kg from pest-present origins | share. Latest-year and max columns removed. Group rows shown only when the pest has both conifer and non-conifer hosts. "Top origins" open by default.
+31. **Write-up LLM: OpenAI**, key in `API_kays/tore_vkm_openai.txt` (Step 9).

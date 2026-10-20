@@ -1,15 +1,17 @@
-# Panel 1: SSB table summary, one block per selected FinnPRIO pathway.
-# Class A = total over all origins for all host commodities of the pathway
-# (row "all_hosts", the ENT3 answer). Class B = pest-present origins only
-# (informational, not ENT3). Per-group rows (conifer, non_conifer) are information.
+# Panel 1: SSB table summary, one block per selected pathway. Tidy table, one
+# value per column: median annual kg over all origins and its ENT3 class for all
+# host commodities of the pathway (row "all_hosts", the ENT3 answer), plus kg from
+# pest-present origins and its share (context only, no class). Per-group rows
+# (conifer, non_conifer) are information.
 
 fmt_num <- function(x) ifelse(is.na(x), "-", format(round(x), big.mark = " ", scientific = FALSE, trim = TRUE))
+fmt_pct <- function(x) ifelse(is.na(x), "-", paste0(round(100 * x), " %"))
 
-group_label <- c(all_hosts = "All host commodities (ENT3)", conifer = "conifer (info)",
-                 non_conifer = "non-conifer (info)")
+group_label <- c(all_hosts = "All host commodities (ENT3)", conifer = "Conifer (info)",
+                 non_conifer = "Non-conifer (info)")
 
 class_badge <- function(label, official = TRUE) {
-  colour <- switch(label, small = "success", medium = "warning", large = "danger", non_existent = "info", "secondary")
+  colour <- switch(label, small = "success", medium = "warning", large = "danger", "secondary")
   shiny::span(class = paste0("badge text-bg-", colour, if (!official) " opacity-75"), label)
 }
 
@@ -33,7 +35,7 @@ origin_summary <- function(imports, lines, stat_years, present, unit = "kg", cou
 bark_subtotal <- function(imports, lines, stat_years) {
   wb <- lines[grepl("with_bark", lines$flags), ]
   if (nrow(wb) == 0) return(NA_real_)
-  stats::median(annual_totals(imports, wb, "kg", stat_years)$quantity)
+  stats::median(annual_totals(imports, wb, stat_years)$quantity)
 }
 
 # Warnings shown under a computed pathway's class table.
@@ -55,29 +57,27 @@ pathway_notes <- function(pathway, r) {
 
 class_rows_ui <- function(cl) {
   cl <- cl[order(match(cl$group, names(group_label))), ]
-  rows <- lapply(unique(paste(cl$group, cl$unit)), function(k) {
-    x <- cl[paste(cl$group, cl$unit) == k, ]
-    a <- x[x$subset == "all", ]
-    b <- x[x$subset == "pest_present", ]
+  if (sum(cl$role == "info") < 2) cl <- cl[cl$role == "ent3", ]  # one group: info row would repeat ENT3
+  stat_head <- paste0(cl$stat[1], " kg/year, ", cl$years[1])
+  rows <- lapply(seq_len(nrow(cl)), function(i) {
+    x <- cl[i, ]
     shiny::tags$tr(
-      class = if (a$role == "ent3") "fw-semibold" else "text-muted",
-      shiny::tags$td(group_label[[a$group]]), shiny::tags$td(a$unit),
-      shiny::tags$td(class_badge(a$class, official = a$role == "ent3"), " ", fmt_num(a$value)),
-      shiny::tags$td(class_badge(b$class, official = FALSE), " ", fmt_num(b$value),
-                     if (isTRUE(b$a_b_differ)) shiny::span(class = "text-danger ms-1", title = "Class B differs from Class A", "≠ A")),
-      shiny::tags$td(paste0(a$stat, " ", a$years)),
-      shiny::tags$td(paste0(fmt_num(a$latest), " / ", fmt_num(b$latest), " (", a$latest_year, ")")),
-      shiny::tags$td(paste0(fmt_num(a$max), " / ", fmt_num(b$max))),
-      shiny::tags$td(if (isTRUE(a$stats_disagree) || isTRUE(b$stats_disagree))
-        shiny::span(class = "text-warning", "statistics land in different classes"))
+      class = if (x$role == "ent3") "fw-semibold" else "text-muted",
+      shiny::tags$td(group_label[[x$group]]),
+      shiny::tags$td(class = "text-end", fmt_num(x$kg)),
+      shiny::tags$td(class_badge(x$class, official = x$role == "ent3")),
+      shiny::tags$td(class = "text-end", fmt_num(x$kg_pest_present)),
+      shiny::tags$td(class = "text-end", fmt_pct(x$share_pest_present))
     )
   })
   shiny::tags$table(
     class = "table table-sm align-middle",
     shiny::tags$thead(shiny::tags$tr(
-      shiny::tags$th("Host commodities"), shiny::tags$th("Unit"), shiny::tags$th("Class A"),
-      shiny::tags$th("Class B (informational, not ENT3)"), shiny::tags$th("Statistic"),
-      shiny::tags$th("Latest A / B"), shiny::tags$th("Max A / B"), shiny::tags$th("")
+      shiny::tags$th("Host commodities"),
+      shiny::tags$th(class = "text-end", paste0("All origins (", stat_head, ")")),
+      shiny::tags$th("ENT3 class"),
+      shiny::tags$th(class = "text-end", "From pest-present origins (kg/year)"),
+      shiny::tags$th(class = "text-end", "Share from pest-present origins")
     )),
     shiny::tags$tbody(rows)
   )
@@ -108,23 +108,16 @@ origins_ui <- function(r, cn8_table, pathway, stat_years) {
 
 pathway_block_ui <- function(p, r, cn8_table, settings) {
   head <- shiny::h5(class = "mt-3", pathway_label(p))
-  type <- pathway_type(p)
-  if (type == "fixed") {
-    return(shiny::tagList(head, shiny::p("ENT3: ", class_badge("non_existent"),
-      " FinnPRIO rule for hitchhiking, natural spread and intentional introduction. No trade data needed.")))
-  }
-  if (type == "manual") {
+  if (pathway_type(p) == "manual") {
     return(shiny::tagList(head, shiny::div(class = "alert alert-secondary py-2",
       "Not computed in v1. Assess manually.")))
   }
   cl <- r$classes[r$classes$pathway == p, ]
   stat_years <- utils::tail(r$years, settings$volume_n)
-  notes <- pathway_notes(p, r)
-  if (any(cl$a_b_differ, na.rm = TRUE)) notes <- c(notes, "Class A and Class B differ.")
   shiny::tagList(
     head, class_rows_ui(cl),
-    shiny::div(class = "alert alert-warning py-2", lapply(notes, shiny::p, class = "mb-1")),
-    shiny::tags$details(shiny::tags$summary("Top origins"), origins_ui(r, cn8_table, p, stat_years))
+    shiny::div(class = "alert alert-warning py-2", lapply(pathway_notes(p, r), shiny::p, class = "mb-1")),
+    shiny::tags$details(open = NA, shiny::tags$summary("Top origins"), origins_ui(r, cn8_table, p, stat_years))
   )
 }
 
@@ -133,7 +126,7 @@ mod_table_ui <- function(id) {
   shiny::tagList(
     shiny::uiOutput(ns("summary")),
     shiny::p(class = "small text-muted",
-      "'none recorded' means no imports in the data; you decide. Units kg and pc are never summed."),
+      "'none recorded' means no imports in the data; you decide. All quantities in kg."),
     shiny::downloadButton(ns("csv"), "Download CSV", class = "btn-sm")
   )
 }

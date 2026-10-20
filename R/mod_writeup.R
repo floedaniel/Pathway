@@ -3,18 +3,13 @@
 # until then each box holds a deterministic draft built only from Panel 1 numbers.
 
 writeup_draft <- function(r, pathway, settings) {
-  type <- pathway_type(pathway)
-  if (type == "fixed") {
-    return(paste0("ENT3: non_existent. Pathway ", pathway_label(pathway), " (FinnPRIO rule)."))
-  }
-  if (type == "manual") return("")
-  cl <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3" &
-                    r$classes$subset == "all" & r$classes$unit == "kg", ]
+  if (pathway_type(pathway) == "manual") return("")
+  cl <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3", ]
   if (nrow(cl) == 0) return("")
   law <- r$law[r$law$pest_match, ]
   cite <- if (nrow(law) > 0) paste0(" Regulated: ", law$id[1], ".") else " Not found in FOR-2000-12-01-1333."
   txt <- paste0("ENT3: ", cl$class, ". ", pathway_label(pathway), ", all host commodities ",
-                fmt_num(cl$value), " kg/yr (", cl$stat, " ", cl$years, ").", cite)
+                fmt_num(cl$kg), " kg/yr (", cl$stat, " ", cl$years, ").", cite)
   substr(txt, 1, settings$writeup_max_chars)
 }
 

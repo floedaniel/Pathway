@@ -3,7 +3,7 @@
 pathway_choice_list <- function() {
   stats::setNames(finnprio_pathways$id,
                   paste0(finnprio_pathways$label,
-                         c(computed = "", fixed = " (non_existent)", manual = " (assess manually)")[finnprio_pathways$type]))
+                         c(computed = "", manual = " (assess manually)")[finnprio_pathways$type]))
 }
 
 mod_input_ui <- function(id) {
@@ -12,7 +12,7 @@ mod_input_ui <- function(id) {
     shiny::textInput(ns("code"), "EPPO code", placeholder = "e.g. IPSXCA"),
     shiny::actionButton(ns("run"), "Run", class = "btn-primary w-100"),
     shiny::hr(),
-    shiny::checkboxGroupInput(ns("pathways"), paste0("Pathways (max ", max_pathways, ")"),
+    shiny::checkboxGroupInput(ns("pathways"), "Pathways",
                               choices = pathway_choice_list(), selected = "plants_for_planting"),
     shiny::uiOutput(ns("pathway_msg")),
     shiny::hr(),
@@ -40,10 +40,9 @@ mod_input_server <- function(id, settings) {
       run = shiny::reactive(input$run),
       code = shiny::reactive(toupper(trimws(input$code))),
       pathways = shiny::reactive(input$pathways %||% character()),
-      # Pre-select defaults after a run, keeping the user's picks within the limit
+      # Pre-select defaults after a run, keeping the user's picks
       preselect = function(groups) {
-        sel <- union(input$pathways, default_pathways(groups))
-        if (length(sel) <= max_pathways) shiny::updateCheckboxGroupInput(session, "pathways", selected = sel)
+        shiny::updateCheckboxGroupInput(session, "pathways", selected = union(input$pathways, default_pathways(groups)))
       }
     )
   })

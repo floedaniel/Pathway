@@ -181,29 +181,7 @@ https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
 
 # Q & A
 
-## Answered (details in docs/decisions.md)
-- **Data sources:** SSB table 08801 (PxWebApi v2), kg (Q1) for all lines; pc (Q2 = stk) only for plants for planting; wood in kg only. EPPO GD API v2. Lovdata public bulk archive (FOR-2000-12-01-1333).
-- **Statistic:** median over 10 years (trade data are skewed).
-- **Pathways (FinnPRIO ids):** `seeds`, `plants_for_planting`, `wood`, `food_fodder`, `other_plant_parts`, `hitchhiking`, `natural_spread`, `intentional_introduction`. User selects up to 5. Pre-selected after a run: `plants_for_planting` always, `wood` when a conifer host is present.
-  - Computed: `plants_for_planting` (0602 + 0601), `wood` (vedlegg 5A nr. 8 scope, incl. bark).
-  - Fixed: `hitchhiking`, `natural_spread`, `intentional_introduction` -> ENT3 `non_existent`, no data.
-  - Manual (v2): `seeds`, `food_fodder`, `other_plant_parts` -> "assess manually".
-  - One ENT3 and one write-up per selected pathway; Panel 1 has one block per pathway.
-- **ENT3 per pathway:** Class A = total over all host commodity lines of the pathway (row "All host commodities"). Per-group rows (conifer, non-conifer) are information. Class B (pest-present origins) is information, not ENT3.
-- **Host classification (programmatic):** conifer = lineage contains Pinopsida, Pinales or Coniferales; non_conifer = any other plant; monocot = EPPO category "Basal monocotyledons" or "Commelinids". No plant host -> stop. Host classes used: Major host + Host.
-- **CN8 lines** (`commodity_cn8.csv`, built by `dev/build_commodity_cn8.R`, source per line):
-  - Plants for planting: all 0602 lines for non_conifer; 5 catch-all lines also for conifer (`upper_bound`); 0601 bulbs/tubers only when a host is a monocot.
-  - Wood: firewood, chips/spon, sawdust and wood waste (incl. bark), round wood, split posts, untreated sleepers, sawn timber > 6 mm, packaging and pallets, oak casks, prefabricated wooden buildings. Out: tropical, eucalyptus round wood, agglomerated, impregnated/treated.
-- **UI warnings:** conifer plants only in catch-all lines; 0601 included/missed (dicot bulbs such as Dahlia, Paeonia are missed); soil has no CN line; wood packaging mostly travels with other goods (no SSB line); non-conifer wood is an upper bound; with-bark round wood shown as information.
-- **Write-up:** English, max 200 characters: class, number with unit, statistic with years, one Lovdata id; no sources line. LLM version in Step 9 (draft from Panel 1 numbers until then).
-- **Test pests:** conifer IPSXCA, DENCPO, POLGPR; non_conifer AROMBU, CERAFP, LYMAMA; both GIBBCI, PHYTRA (has monocot hosts), XYLEFA; PHYTIN = no distribution; IPSXCA = Class A != B.
-- **Keys:** env vars win; otherwise read from git-ignored `API_kays/` (EPPO_beta.txt, anthropic_key.txt, hugging_face.txt). Startup check stays.
-- **HF models:** decide at Step 11 from the router's `/v1/models` (Llama-3.3-70B-Instruct, a large Qwen instruct, NorMistral if served); Ollama is installed locally.
-
-## Findings
-- **EPPO API v2:** host classes Major host, Host, Alternate, Wild/Weed, Experimental, Doubtful host, Non-host (no "Minor host"). Lineage: Kingdom Plantae > Class (Pinopsida; Angiospermae) > Category (e.g. Basal monocotyledons, Fabids) > Order > Family > Genus. Unknown codes return HTTP 400. https://eppo.cloud/api/docs is an unrelated company.
-- **Lovdata:** 305 citable units. Bark beetles regulated as "Scolytidae spp. (ikke-europeiske arter)" (Vedlegg 2, nr. 10); alias file maps Scolytinae -> Scolytidae, conifers -> Coniferales/bartrær. Not named in the regulation: Xylella, Aromia, Lymantria, Dendroctonus, Polygraphus, Fusarium circinatum. Vedlegg 5A tariff numbers are an older format. Mattilsynet holds genus-level import data (§ 20, § 23a): a data request, not v1.
-- **First runs:** ~30 s cold, seconds when cached. Most classes are `large`, as expected for upper-bound CN8 lines; Class B is often much lower (IPSXCA wood: A 1.26 billion kg, B 0.43 million kg).
+Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
 
 ## Open questions for me
-(none right now)
+

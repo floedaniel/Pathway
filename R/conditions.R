@@ -8,9 +8,8 @@ stop_messages <- c(
   no_main_minor     = "No major hosts or hosts registered (other EPPO host classes are not used).",
   no_plant_hosts    = "No plant hosts among the selected EPPO hosts.",
   no_distribution   = "No present-country records in EPPO.",
-  unit_mismatch     = "Unit mismatch for {group}: SSB {unit}, expected kg or pc.",
+  unit_mismatch     = "Unit mismatch for {group}: SSB {unit}, expected kg.",
   no_pathway        = "Select at least one pathway.",
-  too_many_pathways = "{n} pathways selected; FinnPRIO allows at most {max}.",
   missing_secret    = "Missing key(s): {vars}. Set them in ~/.Renviron or put the key files in API_kays/, then restart R.",
   bad_config        = "Invalid setting {field}: {value}."
 )

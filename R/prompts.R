@@ -7,10 +7,11 @@
 #   (median 2016-2025). The figure covers ... so it is an upper bound.
 #
 #   Largest CN8 lines (kg per year, share of total):
-#   06029022: 5.7 million kg (30%)
+#   stauder ikke spesifisert ... (06029022): 5.7 million kg (30%)
 #   ...
 #   Imports from countries where the pest is present (information only, not ENT3):
-#   United States of America: 99 kg per year (median 2016-2025); CN8 lines, total ...
+#   United States of America: 99 kg per year (median 2016-2025)
+#     stiklinger til bruk i gartnerier ..., andre (06021029): 924 kg in total 2016-2025
 #   Canada: no recorded imports
 #
 #   Regulation:
@@ -82,10 +83,17 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   basis <- if (!is.null(r$pathway_info)) pathway_basis(pathway, r) else NULL
   out <- c(out, if (!is.null(basis)) basis, "")
 
+  # "commodity (CN8 code): amount", commodity = short customs-tariff wording
+  label_of <- function(cn8) {
+    used <- inputs$lines_used
+    lab <- if (!is.null(used) && "cn8" %in% names(used)) cn8_short(used)[match(cn8, used$cn8)] else NA
+    lab <- ifelse(is.na(lab) & !is.null(ls), ls$description[match(cn8, ls$cn8)], lab)
+    ifelse(is.na(lab), "", paste0(lab, " "))
+  }
   top <- if (is.null(ls)) ls else utils::head(ls[ls$kg > 0, ], 5)
   if (!is.null(top) && nrow(top) > 0) {
     out <- c(out, "Largest CN8 lines (kg per year, share of total):",
-             paste0(top$code, ": ", fmt_mass(top$kg), " (", fmt_share(top$share),
+             paste0(label_of(top$cn8), "(", top$code, "): ", fmt_mass(top$kg), " (", fmt_share(top$share),
                     ifelse(mixed_line(top$flags), ", mixed line", ""), ")"), "")
   }
 
@@ -95,10 +103,10 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   for (i in seq_len(nrow(pr))) {
     nm <- pr$name[i]
     if (pr$kg[i] > 0 || any(pl$country == pr$country[i])) {
+      out <- c(out, paste0(nm, ": ", fmt_mass(pr$kg[i]), " per year (median ", ent3$years, ")"))
       x <- utils::head(pl[pl$country == pr$country[i], ], 3)
-      detail <- if (nrow(x) > 0) paste0("; CN8 lines, total ", ent3$years, ": ",
-                                        paste0(cn8_code(x$cn8), " ", fmt_mass(x$kg_total), collapse = ", ")) else ""
-      out <- c(out, paste0(nm, ": ", fmt_mass(pr$kg[i]), " per year (median ", ent3$years, ")", detail))
+      if (nrow(x) > 0) out <- c(out, paste0("  ", label_of(x$cn8), "(", cn8_code(x$cn8), "): ",
+                                            fmt_mass(x$kg_total), " in total ", ent3$years))
     } else {
       out <- c(out, paste0(nm, ": no recorded imports"))
     }

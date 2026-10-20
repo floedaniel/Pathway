@@ -46,6 +46,20 @@ pathways_from_commodities <- function(commodities, settings, map = read_commodit
        table = commodities)
 }
 
+# Pathways for a run: from the EPPO host-commodity list when it yields at least one
+# pathway; otherwise (no list, or only information categories such as soil) from
+# the host plants. Information categories are kept for the UI either way.
+choose_pathways <- function(commodities, classified, settings) {
+  pc <- if (nrow(commodities) > 0) pathways_from_commodities(commodities, settings) else NULL
+  if (!is.null(pc) && (length(pc$info) > 0 || length(pc$manual) > 0)) {
+    return(list(pc = pc, source = "eppo_commodities"))
+  }
+  list(pc = list(info = lapply(stats::setNames(computed_pathways, computed_pathways), function(p) pathway_info(classified)),
+                 manual = character(), other = if (is.null(pc)) character() else pc$other,
+                 table = if (is.null(pc)) commodities else pc$table),
+       source = "host_plants")
+}
+
 run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), thresholds = read_thresholds(),
                            law_index_fn = law_index, commodities_fn = eppo_host_commodities,
                            pathways = NULL) {
@@ -56,15 +70,9 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
   groups <- run_groups(classified)                                   # 4
   present <- eppo_present_countries(code, settings)                  # 5
 
-  commodities <- commodities_fn(code, settings)
-  if (nrow(commodities) > 0) {
-    pc <- pathways_from_commodities(commodities, settings)
-    source <- "eppo_commodities"
-  } else {
-    pc <- list(info = lapply(stats::setNames(computed_pathways, computed_pathways), function(p) pathway_info(classified)),
-               manual = character(), other = character(), table = commodities)
-    source <- "host_plants"
-  }
+  chosen <- choose_pathways(commodities_fn(code, settings), classified, settings)
+  pc <- chosen$pc
+  source <- chosen$source
   if (!is.null(pathways)) {  # explicit request (tests, override)
     validate_pathways(pathways)
     pc$info <- pc$info[intersect(names(pc$info), pathways)]

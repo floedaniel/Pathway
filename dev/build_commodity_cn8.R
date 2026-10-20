@@ -97,8 +97,8 @@ out$reviewed <- ""
 # to one of them. `excludes_genera`: residual line ("other ..." / "unnt ...");
 # it counts only when a host genus is outside the list. Others count for any host.
 genus_rules <- list(
-  "^4403(21|22)|^44032005" = "Pinus", "^4403(23|24)" = "Picea",
-  "^44071003|^44071008|^440711" = "Pinus", "^440712" = "Picea",
+  "^4403(21|22)|^44032005" = "Pinus", "^4403(23|24)" = "Picea;Abies",  # tariff: edelgran (Abies) og gran (Picea)
+  "^44071003|^44071008|^440711" = "Pinus", "^440712" = "Picea;Abies",
   "^440713" = "Picea;Pinus;Abies", "^440714" = "Tsuga;Abies",
   "^440391" = "Quercus", "^4403(92|93|94)" = "Fagus", "^4403(95|96)|^4403990[12]_1992" = "Betula",
   "^440397" = "Populus",
@@ -114,8 +114,8 @@ genus_rules <- list(
   "^06021025" = "Chrysanthemum;Saintpaulia;Scaevola;Streptocarpus"
 )
 residual_rules <- list(
-  "^4403(25|26)" = "Pinus;Picea", "^44032006" = "Pinus",
-  "^4407100[49]" = "Pinus", "^44071900" = "Pinus;Picea",
+  "^4403(25|26)" = "Pinus;Picea;Abies", "^44032006" = "Pinus",
+  "^4407100[49]" = "Pinus", "^44071900" = "Pinus;Picea;Abies",
   "^44039900_2017" = "Quercus;Fagus;Betula;Populus;Eucalyptus", "^44039908_2002" = "Quercus;Fagus",
   "^44079900_2007" = "Quercus;Fagus", "^44079900_2017" = "Quercus;Fagus;Acer;Prunus;Fraxinus;Betula;Populus"
 )
@@ -161,7 +161,29 @@ out$tariff_description <- ifelse(current & code8 %in% names(items), unlist(items
 cat("tariff version", tariff$versjon, "- current lines with tariff text:", sum(nzchar(out$tariff_description)),
     "of", sum(current), "\n")
 
-out <- out[, c("pathway", "cn8", "description", "tariff_description", "commodity_group", "eppo_category", "genus",
+# Short readable label: the item's own text, with as many parent levels as needed
+# for the label to be unique among the current lines (e.g. "massevirke" alone
+# occurs 9 times in 4403). The heading text itself is left out unless needed.
+segs <- lapply(out$tariff_description, function(t) if (nzchar(t)) trimws(sub(":$", "", strsplit(t, " > ", fixed = TRUE)[[1]])) else character())
+# start with item + parent (the parent often carries the material, e.g. "av bartrær"),
+# unless the parent is generic ("andre:") or is the heading itself
+parent_generic <- vapply(segs, function(s) length(s) < 3 || grepl("^(andre|ellers|annet)(,|$)", s[length(s) - 1]), logical(1))
+depth <- ifelse(lengths(segs) == 0, 0L, ifelse(parent_generic, 1L, 2L))
+make_label <- function(s, k) paste(utils::tail(s, k), collapse = ", ")
+repeat {
+  lab <- mapply(make_label, segs, depth)
+  dup <- nzchar(lab) & (duplicated(lab) | duplicated(lab, fromLast = TRUE))
+  grow <- dup & depth < lengths(segs)
+  # generic item text ("andre", "ellers") always gets its parent
+  grow <- grow | (depth == 1 & grepl("^(andre|ellers|annet)(,|$)", lab) & lengths(segs) > 1)
+  if (!any(grow)) break
+  depth[grow] <- depth[grow] + 1L
+}
+out$tariff_label <- mapply(make_label, segs, depth)
+cat("distinct tariff labels:", length(unique(out$tariff_label[nzchar(out$tariff_label)])), "of",
+    sum(nzchar(out$tariff_label)), "\n")
+
+out <- out[, c("pathway", "cn8", "description", "tariff_description", "tariff_label", "commodity_group", "eppo_category", "genus",
                "excludes_genera", "flags", "source", "valid_from", "valid_to", "notes", "reviewed")]
 write.csv(out, "data/commodity_cn8.csv", row.names = FALSE, na = "", fileEncoding = "UTF-8")
 print(table(out$pathway, out$commodity_group))

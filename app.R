@@ -78,7 +78,8 @@ server <- function(input, output, session) {
     div(class = "d-flex flex-wrap gap-3 border rounded p-2 mb-2 small",
       span(tags$b(r$pest), " (", r$code, ")"),
       span("Pathways from: ", if (r$pathway_source == "eppo_commodities")
-        paste0("EPPO host commodities (", nrow(r$commodities), " entries)") else "host plants (EPPO lists no host commodities)"),
+        paste0("EPPO host commodities (", nrow(r$commodities), " entries)") else if (length(r$other_categories))
+        paste0("host plants (EPPO lists only ", paste(r$other_categories, collapse = ", "), ")") else "host plants (EPPO lists no host commodities)"),
       span("Hosts: ", n[["conifer"]], " conifer, ", n[["non_conifer"]], " non-conifer",
            if (n[["not_plant"]] > 0) paste0(", ", n[["not_plant"]], " not plants")),
       span("Present in ", length(r$present_countries), " countries"),

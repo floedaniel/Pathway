@@ -19,11 +19,18 @@ lineage_rank <- function(tax, type) {
   if (length(x) == 0) NA_character_ else x[1]
 }
 
+# EPPO's non-taxonomic commodity groups in host-commodity lists (lineage
+# "Commodity groups" > group): "plants" (2PLAN) and "woody plants" (2WOOP) cover
+# conifers too; the herbaceous / vegetable / fruit groups are non-conifer. Unknown
+# groups are treated as all plants (upper bound). No genus filter for any group.
+commodity_group_class <- c("plants" = "all_plants", "woody plants" = "all_plants",
+                           "herbaceous plants" = "non_conifer", "herbaceous ornamental plants" = "non_conifer",
+                           "vegetable plants" = "non_conifer", "fruit plants" = "non_conifer")
+
 classify_host <- function(tax) {
-  # EPPO's non-taxonomic commodity group "plants" (2PLAN) in host-commodity lists
-  all_plants <- any(tax$prefname == "Commodity groups") && any(tolower(tax$prefname) == "plants")
-  host_class <- if (all_plants) {
-    "all_plants"
+  group <- if (any(tax$prefname == "Commodity groups")) tolower(utils::tail(tax$prefname, 1)) else NA
+  host_class <- if (!is.na(group)) {
+    if (group %in% names(commodity_group_class)) commodity_group_class[[group]] else "all_plants"
   } else if (any(tax$prefname %in% conifer_taxa)) {
     "conifer"
   } else if (lineage_rank(tax, "Kingdom") %in% plant_kingdoms) {

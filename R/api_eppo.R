@@ -139,7 +139,15 @@ eppo_validate_code <- function(code, settings) {
 # (preferred names first, then synonyms). Returns the EPPO code or stops.
 resolve_input <- function(x, settings) {
   x <- trimws(x)
-  if (grepl("^[0-9A-Za-z]{5,6}$", x) && !is.null(eppo_overview(toupper(x), settings))) return(toupper(x))
+  if (grepl("^[0-9A-Za-z]{5,6}$", x)) {
+    ov <- eppo_overview(toupper(x), settings)
+    if (!is.null(ov)) {
+      # deactivated code: follow EPPO's replacement (e.g. LITYMC -> LITYCR)
+      rep <- ov$replacedby
+      if (!isTRUE(ov$is_active) && !is.null(rep) && length(rep) == 1 && !is.na(rep) && nzchar(rep)) return(toupper(rep))
+      return(toupper(x))
+    }
+  }
   hits <- eppo_name2codes(x, settings)
   if (nrow(hits) == 0) {
     hits <- as_eppo_tibble(eppo_get("tools/name2codes", settings, query = list(name = x, onlyPreferred = "false")),

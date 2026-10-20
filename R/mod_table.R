@@ -45,6 +45,33 @@ cn8_text <- function(lines) {
   ifelse(!is.na(t) & nzchar(t), t, lines$description)
 }
 
+# Short, readable label from the tariff wording: the item's own text, with its
+# parent (and grandparent) when the item text is generic ("andre", "ellers").
+generic_tariff_text <- "^(andre|ellers|annet|andre slag|i\\.e\\.n\\.)(,|$)"
+tariff_short <- function(x) {
+  vapply(x, function(t) {
+    if (is.na(t) || !nzchar(t)) return(NA_character_)
+    seg <- trimws(sub(":$", "", strsplit(t, " > ", fixed = TRUE)[[1]]))
+    out <- seg[length(seg)]
+    i <- length(seg)
+    while (grepl(generic_tariff_text, seg[i], ignore.case = TRUE) && i > 1) {
+      i <- i - 1
+      out <- paste0(seg[i], ", ", out)
+    }
+    out
+  }, "", USE.NAMES = FALSE)
+}
+
+# Readable label per CN8 line: the unique tariff label from dev/build_commodity_cn8.R
+# (`tariff_label`), else the short tariff text, else the SSB label.
+cn8_short <- function(lines) {
+  n <- nrow(lines)
+  lab <- lines$tariff_label %||% rep(NA_character_, n)
+  s <- tariff_short(lines$tariff_description %||% rep(NA_character_, n))
+  s <- ifelse(!is.na(lab) & nzchar(lab), lab, s)
+  ifelse(is.na(s), lines$description %||% rep(NA_character_, n), s)
+}
+
 # Description of a CN8 line (cut to `width` characters for display).
 cn8_description <- function(cn8, lines, width = Inf) {
   d <- cn8_text(lines)[match(cn8, lines$cn8)]
@@ -127,7 +154,12 @@ pathway_notes <- function(pathway, r) {
   cats <- info$categories
   from_eppo <- !is.null(cats)
   n <- character()
-  if (!from_eppo) n <- c(n, "EPPO lists no host commodities for this pest: CN8 lines are chosen from its host plants (Major host, Host).")
+  if (!from_eppo) {
+    other <- r$other_categories %||% character()
+    n <- c(n, if (length(other) > 0) paste0("EPPO lists only ", paste(other, collapse = ", "),
+                                           " for this pest (no traded commodity with a CN line): CN8 lines are chosen from its host plants (Major host, Host).")
+              else "EPPO lists no host commodities for this pest: CN8 lines are chosen from its host plants (Major host, Host).")
+  }
   if (pathway == "plants_for_planting") {
     if ("conifer" %in% info$groups) n <- c(n, "Conifer plants for planting only appear in catch-all lines. Class is a loose upper bound.")
     if (from_eppo) {

@@ -31,7 +31,7 @@ Working agreements (from the user):
 
 - **App:** complete for v1. Single input, four panels, LLM write-up. All 318 test pests run through the pipeline without R errors (final debugging pass, decision 45).
 - **Tests:** all offline tests pass (253 expectations) (`testthat::test_dir("tests/testthat")`).
-- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `a11a7bf`. **Not yet deployed:** decisions 52-54 (pest-present countries only, plain-language Panel 1, Panel 1 layout); redeploy with `Rscript dev/deploy.R`.
+- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `dbca7e9` (2026-10-20, includes decisions 52-54). Redeploy after changes with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
   - Dashboard: https://connect.posit.cloud/danielflow/content/01a158ac-9fd3-b5d5-8776-1d40f1995348

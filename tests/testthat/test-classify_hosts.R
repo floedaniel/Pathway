@@ -1,8 +1,4 @@
-woody_file <- file.path(root, "data", "woody_taxa.csv")
-
-classify_pest <- function(code, s, woody = read_woody_taxa(woody_file)) {
-  classify_hosts(eppo_selected_hosts(code, s), s, woody = woody)
-}
+classify_pest <- function(code, s) classify_hosts(eppo_selected_hosts(code, s), s)
 
 test_that("conifer-only pest (Ips calligraphus) gives conifer", {
   local_eppo_mock()
@@ -12,52 +8,40 @@ test_that("conifer-only pest (Ips calligraphus) gives conifer", {
   expect_equal(run_groups(ch), "conifer")
 })
 
-test_that("broadleaf-only pest (Aromia bungii) gives broadleaf", {
+test_that("non-conifer pest (Aromia bungii) gives non_conifer", {
   local_eppo_mock()
-  s <- test_settings()
-  expect_equal(run_groups(classify_pest("AROMBU", s)), "broadleaf")
+  expect_equal(run_groups(classify_pest("AROMBU", test_settings())), "non_conifer")
 })
 
 test_that("mixed pest (Phytophthora ramorum) gives both groups", {
   local_eppo_mock()
-  s <- test_settings()
-  expect_setequal(run_groups(classify_pest("PHYTRA", s)), c("conifer", "broadleaf"))
+  expect_setequal(run_groups(classify_pest("PHYTRA", test_settings())), c("conifer", "non_conifer"))
 })
 
-test_that("herbaceous-only pest (Phytophthora infestans) stops: no covered groups", {
+test_that("herbaceous host (potato, P. infestans) is non_conifer: no woody test", {
   local_eppo_mock()
-  s <- test_settings()
-  ch <- classify_pest("PHYTIN", s)
-  expect_equal(ch$host_class, "other")
-  expect_error(run_groups(ch), class = "pathwise_stop_no_groups")
+  ch <- classify_pest("PHYTIN", test_settings())
+  expect_equal(ch$host_class, "non_conifer")
 })
 
-test_that("unlisted angiosperm hosts are unreviewed and trigger their own stop", {
-  local_eppo_mock()
-  s <- test_settings()
-  woody <- read_woody_taxa(woody_file)
-  woody <- woody[woody$taxon != "Solanaceae", ]
-  ch <- classify_pest("PHYTIN", s, woody)
-  expect_equal(ch$host_class, "unreviewed")
-  expect_error(run_groups(ch), "Unreviewed: Solanum tuberosum", class = "pathwise_stop_unreviewed_hosts")
+test_that("Pinales or Coniferales in the lineage also mean conifer", {
+  tax <- tibble::tibble(eppocode = c("1PLAK", "1CONO"), prefname = c("Plantae", "Pinales"),
+                        level = 1:2, type = c("Kingdom", "Order"))
+  expect_equal(classify_host(tax)$host_class, "conifer")
 })
 
-test_that("genus rows override family rows", {
-  woody <- data.frame(rank = c("family", "genus"), taxon = c("Rosaceae", "Fragaria"),
-                      woody = c(TRUE, FALSE), notes = "", reviewed = "")
-  expect_true(woody_lookup("Rosaceae", "Prunus", woody))
-  expect_false(woody_lookup("Rosaceae", "Fragaria", woody))
-  expect_true(is.na(woody_lookup("Fabaceae", "Robinia", woody)))
+test_that("Ginkgo is non_conifer", {
+  tax <- tibble::tibble(eppocode = c("1PLAK", "1GINC"), prefname = c("Plantae", "Ginkgoopsida"),
+                        level = 1:2, type = c("Kingdom", "Class"))
+  expect_equal(classify_host(tax)$host_class, "non_conifer")
 })
 
-test_that("woody_use_unreviewed = FALSE ignores rows without a review date", {
-  woody <- data.frame(rank = "family", taxon = "Fagaceae", woody = TRUE, notes = "", reviewed = "")
-  expect_true(is.na(woody_lookup("Fagaceae", "Quercus", woody, use_unreviewed = FALSE)))
-  woody$reviewed <- "2026-10-20"
-  expect_true(woody_lookup("Fagaceae", "Quercus", woody, use_unreviewed = FALSE))
-})
-
-test_that("conifer family fallback works when the class rank is missing", {
-  tax <- tibble::tibble(eppocode = "X", prefname = "Pinaceae", level = 5L, type = "Family")
-  expect_equal(classify_host(tax, read_woody_taxa(woody_file))$host_class, "conifer")
+test_that("hosts that are not plants stop the run", {
+  local_eppo_mock(list(
+    "taxons/taxon/FUNGHO/hosts" = '[{"eppocode":"FUNGUS","prefname":"Some fungus","class_id":1,"class_label":"Major host"}]',
+    "taxons/taxon/FUNGUS/taxonomy" = '[{"eppocode":"1FUNGK","prefname":"Fungi","level":1,"type":"Kingdom"}]'
+  ))
+  ch <- classify_pest("FUNGHO", test_settings())
+  expect_equal(ch$host_class, "not_plant")
+  expect_error(run_groups(ch), class = "pathwise_stop_no_plant_hosts")
 })

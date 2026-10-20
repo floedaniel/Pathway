@@ -28,3 +28,10 @@ Amendments to the plan in `Pathwise_notes.Rmd`. Newer entries win.
 16. **EPPO host classes.** API v2 has no "Minor host"; `host_classes: [Major host, Host]` (pending confirmation).
 17. **Angiosperm class name.** EPPO v2 lineage uses "Angiospermae"; broadleaf = Angiospermae AND woody in `woody_taxa.csv` (draft list used unreviewed for now, `woody_use_unreviewed: true`).
 18. **Lovdata.** Regulation from the public bulk archive (`gjeldende-sentrale-forskrifter.tar.bz2`, file `sf/sf-20001201-1333.xml`), cached 7 days. Units: § articles, annex rows, annex paragraphs. Search: pest names + EPPO synonyms + pest lineage (+ aliases in `data/law_taxon_aliases.csv`), host genera (+ conifer aliases), countries. A unit is returned when a pest or host term matches; country terms only raise the score.
+
+## 2026-10-20 (later): taxonomic rule replaces the woody list
+Supersedes items 1, 14 and 17 above.
+
+19. **Host classification, programmatic.** conifer = lineage contains Pinopsida, Pinales or Coniferales. non_conifer = any other plant (kingdom Plantae), incl. cycads, Ginkgo, ferns, herbaceous plants. No woody test. `woody_taxa.csv` and the `unreviewed_hosts` / `no_groups` stops are removed; new stop `no_plant_hosts` when no selected host is a plant.
+20. **Host classes.** Major host + Host only. Alternate, Wild/Weed and the other classes are not used.
+21. **CN8 scope from the regulation.** `commodity_cn8.csv` is built by `dev/build_commodity_cn8.R` from current SSB labels. Plants: all 0602 lines (vedlegg 5A nr. 1) count for non_conifer; 5 catch-all lines also count for conifer (`upper_bound;conifer_catch_all`). Wood: vedlegg 5A nr. 8 scope matched on wording (its tariff numbers are an older format); tropical, eucalyptus round wood, agglomerated and impregnated/treated wood out; non-conifer and unsplit wood flagged `upper_bound`. Each line keeps its `source`. Regulation split is conifer / oak / other; "deciduous trees and shrubs" (vedlegg 4A pt 32) is a habit category and not used.

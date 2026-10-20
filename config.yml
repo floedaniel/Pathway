@@ -1,15 +1,11 @@
 # Pathwise settings. Read with load_settings() in R/settings.R.
-# Thresholds, CN8 lines, country exceptions and woody taxa live in data/*.csv, not here.
+# Thresholds, CN8 lines, country exceptions and law aliases live in data/*.csv, not here.
 
 default:
   # EPPO host classes kept for the assessment (fixed, no UI toggle).
   # API v2 labels: Major host, Host, Alternate, Wild/Weed, Experimental,
   # Doubtful host, Non-host. v2 has no "Minor host"; "Host" is used in its place.
   host_classes: [Major host, Host]
-
-  # Use woody_taxa.csv rows without a `reviewed` date (draft list, 2026-10-20:
-  # "get things working first"). Set false to count reviewed rows only.
-  woody_use_unreviewed: true
 
   # SSB 08801: table and graph cover this many years back from the latest complete year
   ssb_years: 10

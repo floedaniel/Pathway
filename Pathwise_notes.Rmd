@@ -177,47 +177,33 @@ https://api.lovdata.no/om-api-tjenesten/
 
 https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
 
+
+
 # Q & A
 
 ## Answered (details in docs/decisions.md)
-- SSB table: 08801, reports kg (Q1) for all plant and wood lines. Wood uses Q1 (kg) only, m³ ignored.
-- Statistic: median over 10 years (trade data are skewed).
-- Write-up: ENT3 only, English, max 200 characters. Class, number with unit, statistic with years, one Lovdata id. No sources line (sources in the footer). One write-up per pathway, pathway selector in the UI (default plants for planting).
-- Host classes: Major host + Host only (v2 has no "Minor host"). Alternate, Wild/Weed, Experimental, Doubtful host, Non-host are not used.
-- Host classification (2026-10-20, programmatic, no reviewed list):
-  - conifer = lineage contains Pinopsida, Pinales or Coniferales.
-  - non_conifer = any other plant (kingdom Plantae), incl. cycads, Ginkgo, ferns, herbaceous plants.
-  - Host that is not a plant -> stop "No plant hosts among the selected EPPO hosts."
-  - woody_taxa.csv and the unreviewed / no-covered-groups stops are dropped.
-- CN8 lines (`commodity_cn8.csv`, built by `dev/build_commodity_cn8.R` from current SSB labels, each line with its `source`):
-  - Plants for planting (vedlegg 5A nr. 1): all 30 0602 lines count for non_conifer; the 5 catch-all lines (06021029, 06029010, 06029021, 06029059, 06029098) also count for conifer, flagged `upper_bound;conifer_catch_all`. UI warning: "Conifer plants for planting only appear in catch-all lines. Class is a loose upper bound."
-  - Wood (vedlegg 5A nr. 8, matched on wording, not on the old tariff numbers): firewood, chips/spon, sawdust and wood waste, round wood, split posts, untreated sleepers, sawn timber > 6 mm, wooden packaging and pallets, oak casks, prefabricated wooden buildings. 102 lines. Out: tropical wood, eucalyptus round wood, agglomerated wood, impregnated/treated wood. Non-conifer and unsplit wood lines are flagged `upper_bound`.
-  - Bark: with-bark subtotal shown as information only (flags `with_bark` / `debarked`), not ENT3.
-- Test pests (live): conifer IPSXCA, DENCPO, POLGPR; non_conifer AROMBU, CERAFP, LYMAMA; both GIBBCI, PHYTRA, XYLEFA. PHYTIN (potato only) has no present-country records in EPPO, so it is the "no distribution" test. Class A != B case: IPSXCA (A large, B small).
-- HF models: decide at Step 11 from the router's `/v1/models` (Llama-3.3-70B-Instruct, a large Qwen instruct, NorMistral if served). Ollama is installed locally, also an option.
-- EPPO key: `API_kays/EPPO_beta.txt` (folder is git-ignored). Startup check stays.
-- Push: origin is HTTPS, pushes work.
-- HF = Hugging Face, a hub for open models reachable through one API.
+- **Data sources:** SSB table 08801 (PxWebApi v2), kg (Q1) for all lines; pc (Q2 = stk) only for plants for planting; wood in kg only. EPPO GD API v2. Lovdata public bulk archive (FOR-2000-12-01-1333).
+- **Statistic:** median over 10 years (trade data are skewed).
+- **Pathways (FinnPRIO ids):** `seeds`, `plants_for_planting`, `wood`, `food_fodder`, `other_plant_parts`, `hitchhiking`, `natural_spread`, `intentional_introduction`. User selects up to 5. Pre-selected after a run: `plants_for_planting` always, `wood` when a conifer host is present.
+  - Computed: `plants_for_planting` (0602 + 0601), `wood` (vedlegg 5A nr. 8 scope, incl. bark).
+  - Fixed: `hitchhiking`, `natural_spread`, `intentional_introduction` -> ENT3 `non_existent`, no data.
+  - Manual (v2): `seeds`, `food_fodder`, `other_plant_parts` -> "assess manually".
+  - One ENT3 and one write-up per selected pathway; Panel 1 has one block per pathway.
+- **ENT3 per pathway:** Class A = total over all host commodity lines of the pathway (row "All host commodities"). Per-group rows (conifer, non-conifer) are information. Class B (pest-present origins) is information, not ENT3.
+- **Host classification (programmatic):** conifer = lineage contains Pinopsida, Pinales or Coniferales; non_conifer = any other plant; monocot = EPPO category "Basal monocotyledons" or "Commelinids". No plant host -> stop. Host classes used: Major host + Host.
+- **CN8 lines** (`commodity_cn8.csv`, built by `dev/build_commodity_cn8.R`, source per line):
+  - Plants for planting: all 0602 lines for non_conifer; 5 catch-all lines also for conifer (`upper_bound`); 0601 bulbs/tubers only when a host is a monocot.
+  - Wood: firewood, chips/spon, sawdust and wood waste (incl. bark), round wood, split posts, untreated sleepers, sawn timber > 6 mm, packaging and pallets, oak casks, prefabricated wooden buildings. Out: tropical, eucalyptus round wood, agglomerated, impregnated/treated.
+- **UI warnings:** conifer plants only in catch-all lines; 0601 included/missed (dicot bulbs such as Dahlia, Paeonia are missed); soil has no CN line; wood packaging mostly travels with other goods (no SSB line); non-conifer wood is an upper bound; with-bark round wood shown as information.
+- **Write-up:** English, max 200 characters: class, number with unit, statistic with years, one Lovdata id; no sources line. LLM version in Step 9 (draft from Panel 1 numbers until then).
+- **Test pests:** conifer IPSXCA, DENCPO, POLGPR; non_conifer AROMBU, CERAFP, LYMAMA; both GIBBCI, PHYTRA (has monocot hosts), XYLEFA; PHYTIN = no distribution; IPSXCA = Class A != B.
+- **Keys:** env vars win; otherwise read from git-ignored `API_kays/` (EPPO_beta.txt, anthropic_key.txt, hugging_face.txt). Startup check stays.
+- **HF models:** decide at Step 11 from the router's `/v1/models` (Llama-3.3-70B-Instruct, a large Qwen instruct, NorMistral if served); Ollama is installed locally.
 
-## Findings from the live EPPO API (2026-10-20)
-- Host classes in API v2: Major host, Host, Alternate, Wild/Weed, Experimental, Doubtful host, Non-host.
-- Lineage types: Kingdom (Plantae), Phylum, Class (Pinopsida; Angiospermae for flowering plants), Category (e.g. Fabids), Order, Family, Genus, Species.
-- Unknown codes return HTTP 400.
-
-## Findings from Lovdata (2026-10-20)
-- FOR-2000-12-01-1333 comes from the public bulk archive (21 MB, no key, updated daily). Parsed into 305 citable units: § articles, annex table rows (e.g. "Vedlegg 2, nr. 10"), annex paragraphs. Deep links to lovdata.no/dokument/SF/forskrift/2000-12-01-1333/...
-- Bark beetles are regulated as "Scolytidae spp. (ikke-europeiske arter)" (Vedlegg 2, nr. 10). EPPO calls the group Scolytinae, so `data/law_taxon_aliases.csv` maps Scolytinae -> Scolytidae and conifers -> Coniferales / bartrær.
-- Not mentioned in the regulation: Xylella, Aromia, Lymantria, Dendroctonus, Polygraphus, Fusarium circinatum. The write-up will say "not found" for these.
-- Vedlegg 5A nr. 8 defines the wood pathway (used for the wood CN8 scope). Its tariff numbers are an older format (last amended 2016).
-- Vedlegg 2 lists host genera per pest; vedlegg 3 and 4A list origin-specific bans. The search matches pest names and host genera.
-- Finer data exist in principle: Mattilsynet holds genus-level import data from consignment notifications (§ 23a) and certificates (§ 20). A data request, not v1.
-
-## Findings from the first end-to-end runs (2026-10-20, Steps 6-7)
-- Pipeline `run_assessment()` (R/pipeline.R): EPPO -> hosts -> groups -> present countries -> SSB 2016-2025 -> classes for both pathways -> Lovdata. ~30 s cold, seconds when cached.
-- IPSXCA: conifer. Wood kg: Class A large (median 1.26 billion kg/yr), Class B small (0.43 million kg from pest-present origins). Plants for planting kg: A large (17.8 million kg, catch-all lines), B small. Good A != B case for the tests.
-- AROMBU: non_conifer. Plants for planting kg: A large, B medium. Wood kg: A and B large.
-- Wood is classified in kg only; its Q2 pieces come only from pallets/crates, so no pc class for wood.
-- Classes for the catch-all and non-conifer lines are loose upper bounds, as expected (most are `large`).
+## Findings
+- **EPPO API v2:** host classes Major host, Host, Alternate, Wild/Weed, Experimental, Doubtful host, Non-host (no "Minor host"). Lineage: Kingdom Plantae > Class (Pinopsida; Angiospermae) > Category (e.g. Basal monocotyledons, Fabids) > Order > Family > Genus. Unknown codes return HTTP 400. https://eppo.cloud/api/docs is an unrelated company.
+- **Lovdata:** 305 citable units. Bark beetles regulated as "Scolytidae spp. (ikke-europeiske arter)" (Vedlegg 2, nr. 10); alias file maps Scolytinae -> Scolytidae, conifers -> Coniferales/bartrær. Not named in the regulation: Xylella, Aromia, Lymantria, Dendroctonus, Polygraphus, Fusarium circinatum. Vedlegg 5A tariff numbers are an older format. Mattilsynet holds genus-level import data (§ 20, § 23a): a data request, not v1.
+- **First runs:** ~30 s cold, seconds when cached. Most classes are `large`, as expected for upper-bound CN8 lines; Class B is often much lower (IPSXCA wood: A 1.26 billion kg, B 0.43 million kg).
 
 ## Open questions for me
-1. **Bulbs and tubers (0601).** Vedlegg 5A nr. 1 covers all plants and propagating material, and non_conifer now includes herbaceous plants. Should 0601 (bulbs, tubers, corms, rhizomes) join plants for planting, or stay out of v1?
+(none right now)

@@ -77,10 +77,13 @@ classify_volume <- function(imports, lines, group, unit, stat = "median", years,
 pc_pathways <- c("plants_for_planting")
 
 classify_pathway <- function(imports, cn8_table, pathway, groups, present_countries, settings,
-                             years, thresholds = read_thresholds()) {
+                             years, thresholds = read_thresholds(), monocot = FALSE) {
   rows <- list()
-  for (g in groups) {
-    lines <- cn8_lines(cn8_table, pathway, g)
+  # "all_hosts" = total over the union of the selected lines (each CN8 line once):
+  # the pathway's Class A, i.e. the ENT3 answer (role "ent3"). Per-group rows are
+  # information (role "info") for when the user wants to split.
+  for (g in c("all_hosts", groups)) {
+    lines <- cn8_lines(cn8_table, pathway, if (g == "all_hosts") groups else g, monocot)
     units <- c("kg", if (pathway %in% pc_pathways && any(lines$q2_unit == "stk")) "pc")
     for (u in units) {
       unit_lines <- if (u == "pc") lines[lines$q2_unit == "stk", ] else lines
@@ -94,6 +97,7 @@ classify_pathway <- function(imports, cn8_table, pathway, groups, present_countr
   }
   out <- dplyr::bind_rows(rows)
   out$pathway <- pathway
+  out$role <- ifelse(out$group == "all_hosts", "ent3", "info")
   # Flag when Class A (official) and Class B (informational) differ
   key <- paste(out$group, out$unit)
   a <- stats::setNames(out$class[out$subset == "all"], key[out$subset == "all"])

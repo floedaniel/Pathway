@@ -71,6 +71,7 @@ test_that("'both' lines count once per group, never twice", {
   a <- res[res$subset == "all" & res$unit == "kg", ]
   expect_equal(a$value[a$group == "conifer"], 2e5)
   expect_equal(a$value[a$group == "non_conifer"], 1e5)
+  expect_equal(a$value[a$group == "all_hosts"], 2e5)  # union: the both-line counted once
 })
 
 test_that("kg and pc are classified separately and never summed", {
@@ -79,7 +80,7 @@ test_that("kg and pc are classified separately and never summed", {
   d <- rbind(imp("S", "DK", yrs, kg = 10, pc = 2e6), imp("N", "DK", yrs, kg = 5, pc = NA))
   res <- classify_pathway(d, cn8, "plants_for_planting", "non_conifer", character(),
                           list(volume_stat = "median", volume_n = 10), yrs, thr)
-  a <- res[res$subset == "all", ]
+  a <- res[res$subset == "all" & res$role == "ent3", ]
   expect_equal(a$value[a$unit == "kg"], 15)
   expect_equal(a$value[a$unit == "pc"], 2e6)
   expect_equal(a$class[a$unit == "pc"], "medium")
@@ -97,5 +98,13 @@ test_that("A/B difference is flagged", {
   cn8 <- data.frame(pathway = "wood", cn8 = "A", commodity_group = "conifer", q2_unit = "nei")
   d <- rbind(imp("A", "DE", yrs, 5e6), imp("A", "US", yrs, 2e5))
   res <- classify_pathway(d, cn8, "wood", "conifer", "US", list(volume_stat = "median", volume_n = 10), yrs, thr)
-  expect_true(res$a_b_differ[res$subset == "pest_present"])
+  expect_true(all(res$a_b_differ[res$subset == "pest_present"]))
+})
+
+test_that("Class A (all_hosts, role ent3) is always present, group rows are info", {
+  cn8 <- data.frame(pathway = "wood", cn8 = "A", commodity_group = "conifer", q2_unit = "nei")
+  res <- classify_pathway(imp("A", "DE", yrs, 5e6), cn8, "wood", "conifer", character(),
+                          list(volume_stat = "median", volume_n = 10), yrs, thr)
+  expect_setequal(res$role, c("ent3", "info"))
+  expect_equal(unique(res$group[res$role == "ent3"]), "all_hosts")
 })

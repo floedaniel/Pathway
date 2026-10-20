@@ -16,6 +16,17 @@ test_that("unknown stop types and missing fields fail loudly", {
   expect_error(stop_app("no_hosts"), "Missing field 'code'")
 })
 
+test_that("local key files fill unset env vars, but never override set ones", {
+  dir <- withr::local_tempdir()
+  writeLines("from-file\n", file.path(dir, "EPPO_beta.txt"))
+  withr::local_envvar(EPPO_KEY = "")
+  load_local_keys(dir)
+  expect_equal(Sys.getenv("EPPO_KEY"), "from-file")
+  withr::local_envvar(EPPO_KEY = "from-env")
+  load_local_keys(dir)
+  expect_equal(Sys.getenv("EPPO_KEY"), "from-env")
+})
+
 test_that("check_secrets names the missing env vars for the configured provider", {
   s <- test_settings()
   withr::local_envvar(EPPO_KEY = "", ANTHROPIC_API_KEY = "", HF_TOKEN = "x")

@@ -6,7 +6,8 @@
 #   plants_for_planting (0602) and wood (scope of FOR-2000-12-01-1333 vedlegg 5A nr. 8).
 # - Plants: every 0602 line counts for non_conifer (herbaceous plants are plants
 #   for planting too); the catch-all lines also count for conifer (no conifer-specific
-#   0602 line exists), flagged upper_bound.
+#   0602 line exists), flagged upper_bound. 0601 (bulbs, tubers) counts only when a
+#   host is a monocot (group "monocot").
 # - Wood: lines whose wording matches a vedlegg 5A nr. 8 entry. Tropical wood,
 #   eucalyptus round wood, agglomerated wood and impregnated/treated wood are out.
 #   The regulation's tariff numbers are an older HS format, so the match is made on
@@ -34,6 +35,14 @@ plants$pathway <- "plants_for_planting"
 plants$commodity_group <- ifelse(plants$cn8 %in% catch_all, "both", "non_conifer")
 plants$flags <- ifelse(plants$cn8 %in% catch_all, "upper_bound;conifer_catch_all", "")
 plants$source <- "vedlegg 5A nr. 1 (planter og formeringsmateriale, unntatt frø)"
+# 0601 bulbs, tubers, corms, rhizomes: part of plants for planting in FinnPRIO,
+# counted only when at least one host is a monocot (group "monocot")
+bulbs <- d[startsWith(code, "0601"), ]
+bulbs$pathway <- "plants_for_planting"
+bulbs$commodity_group <- "monocot"
+bulbs$flags <- "monocot_only"
+bulbs$source <- "vedlegg 5A nr. 1 (planter og formeringsmateriale); FinnPRIO: bulbs/tubers are plants for planting"
+plants <- rbind(bulbs, plants)
 
 # ---- wood (vedlegg 5A nr. 8) -----------------------------------------------
 con <- has("bartr|furu|gran|s-p-f|hem-fir")

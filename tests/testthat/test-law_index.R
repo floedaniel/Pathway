@@ -26,6 +26,13 @@ test_that("Phytophthora ramorum is found in several units", {
   expect_gte(sum(r$pest_match), 2)
 })
 
+test_that("units naming the pest rank above host-only units, however many hosts match", {
+  hosts <- c("Acer", "Aesculus", "Alnus", "Betula", "Castanea", "Cornus", "Syringa", "Prunus")
+  r <- law_search(idx, law_search_terms("Phytophthora ramorum", host_genera = hosts, aliases = aliases))
+  n <- sum(r$pest_match)
+  expect_true(all(r$pest_match[seq_len(n)]))
+})
+
 test_that("a pest absent from the regulation gives no pest match ('not found')", {
   r <- law_search(idx, law_search_terms("Xylella fastidiosa", aliases = aliases))
   expect_equal(sum(r$pest_match), 0)

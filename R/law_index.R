@@ -108,7 +108,8 @@ term_hits <- function(text, terms) {
 }
 
 # Units matching a pest term or a host term. Country terms only raise the score.
-# Score: 3 per pest term, 2 per host term, 1 per country term.
+# Score: 3 per pest term, 2 per host term, 1 per country term. Units naming the
+# pest always come first, so many host genera cannot push them down.
 law_search <- function(index, terms) {
   p <- term_hits(index$text, terms$pest)
   h <- term_hits(index$text, terms$host)
@@ -119,7 +120,7 @@ law_search <- function(index, terms) {
   out$pest_match <- n(p) > 0
   out$score <- 3 * n(p) + 2 * n(h) + n(c)
   out <- out[n(p) > 0 | n(h) > 0, ]
-  out <- out[order(-out$score, out$id), ]
+  out <- out[order(!out$pest_match, -out$score, out$id), ]
   attr(out, "fetched_at") <- attr(index, "fetched_at")
   out
 }

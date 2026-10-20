@@ -93,8 +93,11 @@ read_commodity_cn8 <- function(file = "data/commodity_cn8.csv") {
 }
 
 # CN8 lines for a pathway and a set of groups ("both" lines belong to every group).
-cn8_lines <- function(cn8_table, pathway, groups) {
-  cn8_table[cn8_table$pathway == pathway &
-              (cn8_table$commodity_group %in% groups |
-                 (cn8_table$commodity_group == "both" & length(groups) > 0)), ]
+# "monocot" lines (0601 bulbs, tubers) join non_conifer only when monocot = TRUE,
+# i.e. at least one host is a monocot.
+cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE) {
+  g <- cn8_table$commodity_group
+  keep <- g %in% groups | (g == "both" & length(groups) > 0) |
+    (g == "monocot" & monocot & "non_conifer" %in% groups)
+  cn8_table[cn8_table$pathway == pathway & keep, ]
 }

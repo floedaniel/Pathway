@@ -1,4 +1,6 @@
 "pathway","cn8","description","commodity_group","flags","source","valid_from","valid_to","q2_unit","notes","reviewed"
+"plants_for_planting","06011000_2015","Løker, rotknoller, stengelknoller og rotstokker, i hvilende tilstand","monocot","monocot_only","vedlegg 5A nr. 1 (planter og formeringsmateriale); FinnPRIO: bulbs/tubers are plants for planting",2015,,"stk","",""
+"plants_for_planting","06012000_2001","Løker, rotknoller, stengelknoller og rotstokker i vekst eller blomst; sikoriplanter og -røtter","monocot","monocot_only","vedlegg 5A nr. 1 (planter og formeringsmateriale); FinnPRIO: bulbs/tubers are plants for planting",2001,,"stk","",""
 "plants_for_planting","06021011_2011","Stiklinger uten rot eller in vitro, til bruk i gartnerer, kun grønne planter i tiden 15. desember - 30. april","non_conifer","","vedlegg 5A nr. 1 (planter og formeringsmateriale, unntatt frø)",2011,,"stk","",""
 "plants_for_planting","06021021_2001","Begonia, betlehemsklokke, julestjerne, tåre, hibisk, ildtopp og hengepetunia, uten rot el in vitro, til bruk i gartnerier","non_conifer","","vedlegg 5A nr. 1 (planter og formeringsmateriale, unntatt frø)",2001,,"stk","",""
 "plants_for_planting","06021024_2001","Pelargonium uten rot eller in vitro, til bruk i gartnerier","non_conifer","","vedlegg 5A nr. 1 (planter og formeringsmateriale, unntatt frø)",2001,,"stk","",""

@@ -9,6 +9,10 @@
 
 conifer_taxa <- c("Pinopsida", "Pinales", "Coniferales")
 plant_kingdoms <- c("Plantae")
+# Monocots: EPPO v2 puts them under Category "Basal monocotyledons" or
+# "Commelinids" (verified 2026-10-20 on Tulipa, Lilium, Narcissus, Allium, Zea);
+# Liliopsida / Monocotyledons kept as aliases. Used for the 0601 (bulbs) rule.
+monocot_taxa <- c("Basal monocotyledons", "Commelinids", "Liliopsida", "Monocotyledons")
 
 lineage_rank <- function(tax, type) {
   x <- tax$prefname[tax$type == type]
@@ -24,7 +28,8 @@ classify_host <- function(tax) {
     "not_plant"
   }
   tibble::tibble(family = lineage_rank(tax, "Family"), genus = lineage_rank(tax, "Genus"),
-                 host_class = host_class)
+                 host_class = host_class,
+                 monocot = host_class == "non_conifer" && any(tax$prefname %in% monocot_taxa))
 }
 
 # hosts: tibble from eppo_selected_hosts(). Returns hosts with lineage and host_class.

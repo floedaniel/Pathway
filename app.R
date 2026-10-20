@@ -38,10 +38,7 @@ ui <- bslib::page_fluid(
     bslib::accordion(open = FALSE,
       bslib::accordion_panel("Derived inputs (EPPO hosts and present countries)", uiOutput("derived")))
   ),
-  tags$footer(class = "small text-muted mt-3",
-    p("Import statistics show recorded trade, not pest pressure or entry. CN8 lines cover whole commodity groups, ",
-      "so classes are an upper bound for host-specific volume. Pathways come from the EPPO host-commodity list."),
-    textOutput("fetch_dates"))
+  tags$footer(class = "small text-muted mt-3", textOutput("fetch_dates"))
 )
 
 server <- function(input, output, session) {

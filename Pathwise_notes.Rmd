@@ -182,6 +182,25 @@ Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after 
 
 # Q & A
 
+in eppo global database: In the database, the following categories are available (some cannot be searched for, as they are not attached to a specific plant species, e.g. agricultural machinery):
+• Agricultural machinery
+• All commodities
+• Bark
+• Bulbs or tubers
+• Cut flowers or branches
+• Fruits or vegetables
+• Manufactured articles
+• Non-squared wood
+• Packaging material
+• Plants for planting
+• Plant waste
+• Pollen
+• Seeds
+• Soil/growing medium
+• Squared wood
+• Stored products
+
+
 Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
 
 ## Open questions for me

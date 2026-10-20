@@ -20,7 +20,7 @@ default:
     hf_base_url: https://router.huggingface.co/v1
 
   language: en              # write-up language
-  writeup_max_chars: 400    # ENT3 write-up length (200 was too short, 2026-10-20)
+  writeup_max_chars: 1200   # ENT3 write-up length: detailed, with CN8 codes (2026-10-20)
 
   cache:
     dir: cache

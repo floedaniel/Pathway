@@ -3,14 +3,26 @@
 # results, validated, and labelled; falls back to a draft built only from
 # Panel 1 numbers when the LLM output fails validation or the call fails.
 
-writeup_draft <- function(r, pathway, settings) {
+writeup_draft <- function(r, pathway, settings, inputs = NULL) {
   if (pathway_type(pathway) == "manual") return("")
   cl <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3", ]
   if (nrow(cl) == 0) return("")
   law <- r$law[r$law$pest_match, ]
   cite <- if (nrow(law) > 0) paste0(" Regulated: ", law$id[1], ".") else " Not found in FOR-2000-12-01-1333."
-  txt <- paste0("ENT3: ", cl$class, ". ", pathway_label(pathway), ", all host commodities ",
-                fmt_num(cl$kg), " kg/yr (", cl$stat, " ", cl$years, ").", cite)
+  main <- ""
+  if (!is.null(inputs$lines) && nrow(inputs$lines) > 0 && inputs$lines$kg[1] > 0) {
+    top <- utils::head(inputs$lines[inputs$lines$kg > 0, ], 3)
+    main <- paste0(" Main CN8 lines: ", paste0(top$code, " ", fmt_num(top$kg), " kg", collapse = ", "), ".")
+  }
+  pres <- ""
+  if (!is.null(inputs$present)) {
+    p <- inputs$present[inputs$present$kg > 0, ]
+    pres <- if (nrow(p) == 0) " No recorded imports from pest-present countries." else
+      paste0(" From pest-present countries: ", paste0(utils::head(p$name, 4), " ", fmt_num(utils::head(p$kg, 4)), " kg",
+                                                      collapse = ", "), ".")
+  }
+  txt <- paste0(pathway_label(pathway), ": ENT3 is ", cl$class, ". All host commodities ",
+                fmt_num(cl$kg), " kg/yr (", cl$stat, " ", cl$years, ").", main, pres, cite)
   substr(txt, 1, settings$writeup_max_chars)
 }
 

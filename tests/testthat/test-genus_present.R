@@ -12,6 +12,18 @@ test_that("birch host: birch wood lines in, oak/beech/ash lines out, mixed lines
   expect_true("44152000_2001" %in% w$cn8)    # pallets (both)
 })
 
+test_that("host families do not switch on residual lines (Betula + Betulaceae)", {
+  w <- cn8_lines(cn8_table, "wood", "non_conifer", host_genera = list(non_conifer = c("Betula", "Betulaceae")))
+  expect_false("44079900_2017" %in% w$cn8)
+})
+
+test_that("lines that list genera (06029021: Buxus, Ilex, ... palms) need a host in the list", {
+  p <- cn8_lines(cn8_table, "plants_for_planting", "non_conifer", host_genera = list(non_conifer = c("Betula", "Betulaceae")))
+  expect_false("06029021_2011" %in% p$cn8)
+  palm <- cn8_lines(cn8_table, "plants_for_planting", "non_conifer", host_genera = list(non_conifer = c("Phoenix", "Arecaceae")))
+  expect_true("06029021_2011" %in% palm$cn8)
+})
+
 test_that("a host outside the genus-specific lines brings in the residual line", {
   w <- cn8_lines(cn8_table, "wood", "non_conifer", host_genera = list(non_conifer = c("Betula", "Ulmus")))
   expect_true("44079900_2017" %in% w$cn8)
@@ -62,7 +74,7 @@ test_that("pest-present table lists every present country, also without imports"
   expect_equal(po$country, c("US", "CA"))
   expect_equal(po$kg, c(200, 0))
   expect_equal(po$years_with_imports, c(2L, 0L))
-  expect_equal(po$main_commodity[1], "Trelast av bjørk")
+  expect_equal(po$main_commodity[1], "A Trelast av bjørk")
 })
 
 test_that("graph stacks the largest origin at the bottom (last factor level), Other on top", {

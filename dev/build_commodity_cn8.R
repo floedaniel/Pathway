@@ -105,7 +105,12 @@ genus_rules <- list(
   "^440791" = "Quercus", "^440792" = "Fagus", "^440793" = "Acer", "^440794" = "Prunus",
   "^440795" = "Fraxinus", "^440796" = "Betula", "^440797" = "Populus",
   "^44160010" = "Quercus",
-  "^060230" = "Rhododendron", "^060240" = "Rosa"
+  "^060230" = "Rhododendron", "^060240" = "Rosa",
+  # plant lines that list their genera in the label (palmer = family Arecaceae;
+  # kransgran = Sciadopitys, a conifer, hence group "both")
+  "^06029021" = "Buxus;Dracaena;Laurus;Camellia;Sciadopitys;Ilex;Magnolia;Arecaceae;Hamamelis;Chimonanthus",
+  "^06021024" = "Pelargonium",
+  "^06021025" = "Chrysanthemum;Saintpaulia;Scaevola;Streptocarpus"
 )
 residual_rules <- list(
   "^4403(25|26)" = "Pinus;Picea", "^44032006" = "Pinus",

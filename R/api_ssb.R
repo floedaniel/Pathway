@@ -105,25 +105,31 @@ cn8_lines <- function(cn8_table, pathway, groups, monocot = FALSE, host_genera =
   if (is.null(host_genera) || nrow(x) == 0) return(x)
   split_genera <- function(s) if (is.na(s) || !nzchar(s)) character() else strsplit(s, ";")[[1]]
   ok <- vapply(seq_len(nrow(x)), function(i) {
-    grp <- if (x$commodity_group[i] %in% c("conifer", "non_conifer")) x$commodity_group[i] else NA
-    if (is.na(grp) || !grp %in% names(host_genera) || is.null(host_genera[[grp]])) return(TRUE)
-    hg <- host_genera[[grp]]
+    grp <- x$commodity_group[i]
+    # "both" / "monocot" lines: judged on the hosts of all requested groups
+    use <- if (grp %in% c("conifer", "non_conifer")) grp else intersect(c("conifer", "non_conifer"), groups)
+    use <- intersect(use, names(host_genera))
+    if (length(use) == 0 || any(vapply(host_genera[use], is.null, logical(1)))) return(TRUE)
+    hg <- unlist(host_genera[use])
     only <- split_genera(x$genus[i])
     excl <- split_genera(x$excludes_genera[i])
     if (length(only) > 0) return(any(hg %in% only))
-    if (length(excl) > 0) return(any(!hg %in% excl))
+    # residual lines: judged on genera only (family names end in -aceae)
+    if (length(excl) > 0) return(any(!hg[!grepl("aceae$", hg)] %in% excl))
     TRUE
   }, logical(1))
   x[ok, ]
 }
 
-# Host genera per group for cn8_lines(); NULL for a group where some host has no
-# genus in its lineage (e.g. a family-level host), so that group is not filtered.
+# Host genera (and their families, for lines that name a family such as palms)
+# per group for cn8_lines(); NULL for a group where some host has no genus in its
+# lineage (e.g. a family-level host), so that group is not filtered.
 host_genera_by_group <- function(classified) {
   out <- lapply(c(conifer = "conifer", non_conifer = "non_conifer"), function(g) {
-    gen <- classified$genus[classified$host_class == g]
+    sel <- classified$host_class == g
+    gen <- classified$genus[sel]
     if (length(gen) == 0) return(character())
-    if (anyNA(gen)) NULL else unique(gen)
+    if (anyNA(gen)) NULL else unique(stats::na.omit(c(gen, classified$family[sel])))
   })
   out[!vapply(out, function(x) !is.null(x) && length(x) == 0, logical(1))]
 }

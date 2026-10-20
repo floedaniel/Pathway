@@ -31,21 +31,26 @@ test_that("no imports give 'none recorded', not non_existent", {
   expect_equal(r$class, "none recorded")
 })
 
-test_that("countries are summed before classifying (ENT3 = total into the PRA area)", {
+test_that("countries are summed before classifying", {
   d <- rbind(imp("A", "DE", yrs, 600000), imp("A", "SE", yrs, 600000))
   r <- classify_volume(d, lines_of("A"), "conifer", "median", yrs, thresholds = thr)
   expect_equal(r$kg, 1200000)
   expect_equal(r$class, "medium")
 })
 
-test_that("pest-present origins are shown as kg and share, without a class", {
-  d <- rbind(imp("A", "DE", yrs, 5e6), imp("A", "US", yrs, 2e5))
-  r <- classify_volume(d, lines_of("A"), "conifer", "median", yrs, present_countries = "US", thresholds = thr)
-  expect_equal(r$kg, 5.2e6)
-  expect_equal(r$class, "medium")
-  expect_equal(r$kg_pest_present, 2e5)
-  expect_equal(r$share_pest_present, 2e5 / 5.2e6)
-  expect_false("class_pest_present" %in% names(r))
+test_that("ENT3 uses only imports from pest-present countries (user's rule)", {
+  s <- test_settings()
+  fake_fetch <- function(cn8, years) {
+    tibble::tibble(cn8 = cn8, country = c("DE", "US"), year = 2025L, kg = c(5e6, 2e5), value_nok = 0)
+  }
+  meta <- list(cn8 = tibble::tibble(cn8 = "A", q1_unit = "kg"))
+  d <- ssb_imports(data.frame(cn8 = "A", commodity_group = "conifer"), 2025L, s, meta = meta,
+                   fetch_chunk = fake_fetch, countries = c("US", "CA"))
+  expect_equal(unique(d$country), "US")
+  r <- classify_volume(d, lines_of("A"), "conifer", "median", 2025L, thresholds = thr)
+  expect_equal(r$kg, 2e5)
+  expect_equal(r$class, "small")
+  expect_false(any(c("kg_pest_present", "share_pest_present") %in% names(r)))
 })
 
 test_that("median over the last volume_n years", {
@@ -63,9 +68,8 @@ test_that("years without imports count as zero", {
 test_that("output is tidy: one row per group, one value per column", {
   cn8 <- data.frame(pathway = "wood", cn8 = c("C", "B"), commodity_group = c("conifer", "both"))
   d <- rbind(imp("C", "DE", yrs, 1e5), imp("B", "DE", yrs, 1e5))
-  res <- classify_pathway(d, cn8, "wood", info_of(c("conifer", "non_conifer")), character(), cfg, yrs, thr)
-  expect_equal(names(res), c("pathway", "group", "role", "stat", "years", "kg", "class",
-                             "kg_pest_present", "share_pest_present"))
+  res <- classify_pathway(d, cn8, "wood", info_of(c("conifer", "non_conifer")), cfg, yrs, thr)
+  expect_equal(names(res), c("pathway", "group", "role", "stat", "years", "kg", "class"))
   expect_equal(nrow(res), 3)
   expect_true(all(vapply(res, function(x) is.atomic(x) && length(x) == 3, logical(1))))
 })
@@ -73,7 +77,7 @@ test_that("output is tidy: one row per group, one value per column", {
 test_that("'both' lines count once per group; all_hosts is the union", {
   cn8 <- data.frame(pathway = "wood", cn8 = c("C", "B"), commodity_group = c("conifer", "both"))
   d <- rbind(imp("C", "DE", yrs, 1e5), imp("B", "DE", yrs, 1e5))
-  res <- classify_pathway(d, cn8, "wood", info_of(c("conifer", "non_conifer")), character(), cfg, yrs, thr)
+  res <- classify_pathway(d, cn8, "wood", info_of(c("conifer", "non_conifer")), cfg, yrs, thr)
   expect_equal(res$kg[res$group == "conifer"], 2e5)
   expect_equal(res$kg[res$group == "non_conifer"], 1e5)
   expect_equal(res$kg[res$group == "all_hosts"], 2e5)

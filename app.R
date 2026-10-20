@@ -79,7 +79,8 @@ server <- function(input, output, session) {
         paste0("host plants (EPPO lists only ", paste(r$other_categories, collapse = ", "), ")") else "host plants (EPPO lists no host commodities)"),
       span("Hosts: ", n[["conifer"]], " conifer, ", n[["non_conifer"]], " non-conifer",
            if (n[["not_plant"]] > 0) paste0(", ", n[["not_plant"]], " not plants")),
-      span("Present in ", length(r$present_countries), " countries"),
+      span("SSB imports only from the ", length(origin_countries(r)), " countries where the pest is present",
+           if ("NO" %in% r$present_countries) " (also present in Norway)"),
       if (!is.null(r$years)) span("Years ", min(r$years), "-", max(r$years)))
   })
 

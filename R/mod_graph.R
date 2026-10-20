@@ -1,15 +1,14 @@
 # Panel 2: SSB graph. 10 years, one facet per host group, stacked bars of the top N
-# origins (rest as "Other"), largest origin at the bottom of the stack. Origins:
-# all countries or pest-present countries only.
+# origins (rest as "Other"), largest origin at the bottom of the stack. Origins are
+# only the countries where the pest is present (r$imports holds nothing else).
 # ggplot2 + viridis.
 
 # info: the pathway's host selection (pinfo(r, pathway)).
 # Legend: each origin is named with its largest CN8 codes in the pathway (up to
 # n_codes, largest first, over the shown years), computed once over the whole
 # pathway so a country keeps one colour and one legend entry across facets.
-graph_data <- function(imports, cn8_table, pathway, info, years, present, country_names = character(),
-                       top_n = 6, origins = c("all", "present"), n_codes = 3) {
-  origins <- match.arg(origins)
+graph_data <- function(imports, cn8_table, pathway, info, years, country_names = character(),
+                       top_n = 6, n_codes = 3) {
   all_lines <- pathway_lines(cn8_table, pathway, info)
   xa <- imports[imports$cn8 %in% all_lines$cn8 & imports$year %in% years, ]
   per_line <- dplyr::summarise(dplyr::group_by(xa, country, cn8), q = sum(kg, na.rm = TRUE), .groups = "drop")
@@ -23,7 +22,6 @@ graph_data <- function(imports, cn8_table, pathway, info, years, present, countr
   rows <- lapply(info$groups, function(g) {
     lines <- pathway_lines(cn8_table, pathway, info, g)
     x <- imports[imports$cn8 %in% lines$cn8 & imports$year %in% years, ]
-    if (origins == "present") x <- x[x$country %in% present, ]
     if (nrow(x) == 0) return(NULL)
     by_c <- dplyr::summarise(dplyr::group_by(x, country, year), q = sum(kg, na.rm = TRUE), .groups = "drop")
     totals <- sort(tapply(by_c$q, by_c$country, sum), decreasing = TRUE)
@@ -43,18 +41,16 @@ graph_data <- function(imports, cn8_table, pathway, info, years, present, countr
   d
 }
 
-graph_plot <- function(d, title, origins = "all") {
+graph_plot <- function(d, title) {
   ggplot2::ggplot(d, ggplot2::aes(factor(year), quantity / 1e6, fill = origin)) +
     ggplot2::geom_col() +
     ggplot2::facet_wrap(~group, scales = "free_y", ncol = 1) +
     ggplot2::scale_fill_viridis_d(option = "D") +
     ggplot2::labs(x = NULL, y = "million kg", title = title,
-                  fill = paste0(if (origins == "all") "Country of origin" else "Pest-present country",
-                                "\n(largest CN8 lines)"),
-                  caption = paste0("Bars: imports per year, stacked by country of origin (largest at the bottom). ",
-                                   "Codes in the legend: each country's largest CN8 lines in this pathway.
-",
-                                   "See Panel 1 for all lines. Source: SSB table 08801.")) +
+                  fill = "Pest-present country\n(largest CN8 lines)",
+                  caption = paste0("Bars: imports per year from countries where the pest is present, stacked by country ",
+                                   "(largest at the bottom).\nCodes in the legend: each country's largest CN8 lines in ",
+                                   "this pathway. See Panel 1 for all lines. Source: SSB table 08801.")) +
     ggplot2::theme_minimal(base_size = 13) +
     ggplot2::theme(legend.position = "right", plot.caption = ggplot2::element_text(hjust = 0, size = 10))
 }
@@ -62,10 +58,7 @@ graph_plot <- function(d, title, origins = "all") {
 mod_graph_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
-    shiny::div(class = "d-flex gap-4",
-      shiny::uiOutput(ns("choose")),
-      shiny::radioButtons(ns("origins"), NULL, inline = TRUE,
-                          choices = c("All origins" = "all", "Pest-present origins only" = "present"))),
+    shiny::uiOutput(ns("choose")),
     shiny::plotOutput(ns("plot"), height = "520px"),
     shiny::downloadButton(ns("png"), "Download PNG", class = "btn-sm")
   )
@@ -87,17 +80,13 @@ mod_graph_server <- function(id, result, pathways, cn8_table) {
     plot_obj <- shiny::reactive({
       r <- result()
       shiny::req(is.list(r), !inherits(r, "condition"))
-      origins <- input$origins %||% "all"
-      d <- graph_data(r$imports, cn8_table, pathway(), pinfo(r, pathway()), r$years, r$present_countries,
-                      r$country_names, origins = origins)
-      shiny::validate(shiny::need(nrow(d) > 0, if (origins == "present")
-        "No recorded imports from countries where the pest is present." else "No imports recorded for this pathway."))
-      graph_plot(d, paste0(r$pest, ": imports, ", pathway_label(pathway()),
-                           if (origins == "present") ", pest-present origins"), origins)
+      d <- graph_data(r$imports, cn8_table, pathway(), pinfo(r, pathway()), r$years, r$country_names)
+      shiny::validate(shiny::need(nrow(d) > 0, "No recorded imports from countries where the pest is present."))
+      graph_plot(d, paste0(r$pest, ": imports from pest-present countries, ", pathway_label(pathway())))
     })
     output$plot <- shiny::renderPlot(plot_obj())
     output$png <- shiny::downloadHandler(
-      filename = function() paste0("pathwise_", result()$code, "_", pathway(), "_", input$origins, ".png"),
+      filename = function() paste0("pathwise_", result()$code, "_", pathway(), ".png"),
       content = function(file) ggplot2::ggsave(file, plot_obj(), width = 10, height = 7, dpi = 150)
     )
   })

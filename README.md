@@ -2,6 +2,8 @@
 
 Pathwise answers FinnPRIO question **ENT3**, "How large a volume of the considered host plant commodity is traded into the PRA area annually?", for Norway. The only input is an **EPPO code** or a **scientific name** of a pest.
 
+Only imports from the **countries where the pest is present** (EPPO distribution) are used. For *Agrilus anxius* that means imports from Canada and the USA, nothing else. Norway itself is never an origin.
+
 It is an R Shiny app. All numbers, classes and regulation snippets come straight from EPPO, Statistics Norway (SSB), the Norwegian customs tariff and Lovdata, and are computed the same way every time. An LLM writes only one sentence per regulation unit in the write-up. Its output is checked before it is shown.
 
 * **Online:** https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/ (Posit Connect Cloud)
@@ -32,14 +34,14 @@ The app stops at start with a clear message if a needed key is missing. SSB, the
 
 Type an EPPO code or a scientific name (e.g. `AGRLAX` or `Agrilus anxius`) and press **Run**. The pathways are chosen from the pest's EPPO host-commodity list, or from its host plants when EPPO has no list. There is nothing else to choose.
 
-* **Header:** pest and code, where the pathways come from, number of conifer and non-conifer hosts, number of countries where the pest is present, years.
-* **Panel 1, SSB table:** one block per pathway.
-  * *All host commodities (ENT3)*: median annual import in kg over 10 years, all origins, and its FinnPRIO class (`small`, `medium`, `large`). Beside it, the kg from countries where the pest is present and its share. This share is context only, not ENT3. Conifer and non-conifer rows appear only when the pest has both kinds of host.
+* **Header:** pest and code, where the pathways come from, number of conifer and non-conifer hosts, the number of countries where the pest is present (whose imports are used), years.
+* **Panel 1, SSB table:** one block per pathway. All numbers are imports from the countries where the pest is present.
+  * *All host commodities (ENT3)*: median annual import in kg over 10 years, summed over those countries, and its FinnPRIO class (`small`, `medium`, `large`). Conifer and non-conifer rows appear only when the pest has both kinds of host.
+  * *Imports by country where the pest is present*: one value per column (country, ISO code, kg/year, share, NOK/year, years with imports, main CN8 code, its description). Countries without recorded imports are listed below the table.
+  * *CN8 lines in this pathway*: code, customs-tariff wording, median kg/year, share, kg in total over the 10 years (sparse lines often have a median of 0), flags.
   * Notes on the basis (EPPO list or host plants) and on where the number is an upper bound.
-  * *CN8 lines in this pathway*: code, customs-tariff wording, median kg/year, share, kg from pest-present countries, flags.
-  * *Pest-present countries* and *Top origins*: one value per column (country, ISO code, kg/year, share, NOK/year, years with imports, main CN8 code, its description).
   * *Host search in SSB table 08801*: every 08801 line whose label names a host genus (Latin or Norwegian name, e.g. *bjørk* for *Betula*), with its status: counted, label excludes the host, or not counted and why.
-* **Panel 2, SSB graph:** imports per year as stacked bars by country of origin. It shows the top 6 countries plus "Other countries", with the largest at the bottom, and one facet per host group. Each legend entry names the country and its largest CN8 lines. A switch shows all origins or pest-present countries only. You can download it as PNG.
+* **Panel 2, SSB graph:** imports per year from the pest-present countries as stacked bars by country. It shows the top 6 countries plus "Other countries", with the largest at the bottom, and one facet per host group. Each legend entry names the country and its largest CN8 lines. You can download it as PNG.
 * **Panel 3, Lovdata:** units of FOR-2000-12-01-1333 that name the pest, then origin rules (host genus plus a pest-present country), then units naming only the host. Each has an id such as *Vedlegg 3, nr. 11*, a link and a copy button.
 * **Panel 4, FinnPRIO write-up:** one editable text per computed pathway, with Copy and Regenerate. It is labelled with the model that wrote the regulation lines.
 * **Derived inputs** (collapsed): present countries, the EPPO host-commodity table with its FinnPRIO mapping, and the host plants.
@@ -56,8 +58,9 @@ EPPO code or scientific name
   -> EPPO host commodities (gd.eppo.int/taxon/{code}/pathwayshosts):
        category + host genus -> FinnPRIO pathway and CN8 lines;
        no list, or only soil/machinery -> both pathways from host plants, labelled
-  -> SSB 08801: kg and NOK of the pathway's CN8 lines, all origins, 10 years
-  -> sum over origins per year, median over 10 years -> FinnPRIO class
+  -> SSB 08801: kg and NOK of the pathway's CN8 lines, 10 years,
+       only from the countries where the pest is present (Norway excluded)
+  -> sum over those countries per year, median over 10 years -> FinnPRIO class
   -> SSB host search: all 08801 labels searched for the host genera
   -> Lovdata FOR-2000-12-01-1333: units naming the pest, origin rules, host units
   -> write-up: fixed layout filled by R; LLM sentence per regulation unit, checked
@@ -105,26 +108,31 @@ Lines are in `data/commodity_cn8.csv` (134 lines), built by `dev/build_commodity
   * Mixed lines (firewood, chips, waste, packaging, catch-all plants) count for any host and are marked as an upper bound.
 
 ### ENT3 classes
-Classes come from `data/finnprio_thresholds.csv`. They are applied to the median annual kg, summed over all origins, for 2016-2025: under 1 000 000 is small, up to and including 10 000 000 is medium, and anything above is large.
+Classes come from `data/finnprio_thresholds.csv`. They are applied to the median annual kg, summed over the countries where the pest is present, for 2016-2025: under 1 000 000 is small, up to and including 10 000 000 is medium, and anything above is large.
 
-If nothing was imported, the result is *none recorded*, not `non_existent`; the assessor decides. Imports from pest-present countries are shown as kg and share, never as a class.
+If nothing was imported from those countries, the result is *none recorded*, not `non_existent`; the assessor decides.
+
+Imports from countries where the pest is absent are not used anywhere in the app. `ssb_imports()` drops them as soon as the data arrive, so the tables, the graph and the write-up never see them. SSB is still queried for all origins: the cached data are then shared between pests, and the filter is applied afterwards. Norway, where some pests are already present, is never treated as an origin. It is also left out of the countries used to find Lovdata origin rules.
 
 ### Write-up
 `R/prompts.R` builds a fixed plain-text layout that pastes cleanly into FinnPRIO:
 
 ```
-ENT3: Large
+ENT3: Small
 
-Annual import into Norway of wood (CN 44, 9406.10): 291.9 million kg (median 2016-2025). ... upper bound.
+Annual import into Norway of wood (CN 44, 9406.10) from the countries where the pest is present
+(Canada, United States of America): 49 144 kg (median 2016-2025). Imports from other countries are
+not counted. ... upper bound.
 Basis: EPPO host commodities: ...; host genera: Betula.
 
-Largest CN8 lines (kg per year, share of total):
-lastepaller, kassepaller og andre paller av tre; pallekarmer (44152000): 83.8 million kg (29%, mixed line)
+Largest CN8 lines (median kg per year, share of total, kg in total):
+lastepaller, kassepaller og andre paller av tre; pallekarmer (44152000): 32 526 kg per year (66%, mixed line), 327 671 kg in total 2016-2025
 ...
-Imports from countries where the pest is present (information only, not ENT3):
+Imports by country:
 United States of America: 44 932 kg per year (median 2016-2025)
   lastepaller, kassepaller og andre paller av tre; pallekarmer (44152000): 306 069 kg in total 2016-2025
 ...
+No recorded imports from: <countries>  (when some pest-present countries have none)
 Regulation:
 Vedlegg 3, nr. 11: <one sentence>
 ...
@@ -135,7 +143,8 @@ R fills in the class, the numbers, the CN8 codes and the notes. The LLM (OpenAI 
 
 ## Read the results with care
 * Import statistics show **recorded trade**, not pest pressure or entry.
-* CN8 lines cover whole commodity groups, so the class is an **upper bound** for the host-specific volume, and most pests come out `large`. The pest-present share and the CN8 line table help judge how much of it matters.
+* Only trade from countries where EPPO records the pest as present is counted. Countries missing from the EPPO distribution, and goods re-exported through third countries, are not covered.
+* CN8 lines cover whole commodity groups, so the class is an **upper bound** for the host-specific volume. The CN8 line table helps judge how much of it matters.
 * Wood packaging mostly travels with other goods and has no SSB line. Manufactured articles are counted only as casks and prefabricated wooden buildings. Soil has no CN line.
 * Seeds, food and fodder, and other plant parts are listed for manual assessment.
 
@@ -191,7 +200,7 @@ Pathwise_notes.Rmd        project notes and open questions
 ```r
 testthat::test_dir("tests/testthat")
 ```
-233 tests, all offline. EPPO responses and host-commodity pages are recorded in `tests/testthat/fixtures/`; refresh them with `Rscript dev/record_eppo_fixtures.R`. Lovdata is a stored copy of the regulation, and the LLM is faked.
+238 tests, all offline. EPPO responses and host-commodity pages are recorded in `tests/testthat/fixtures/`; refresh them with `Rscript dev/record_eppo_fixtures.R`. Lovdata is a stored copy of the regulation, and the LLM is faked.
 
 ## Deployment
 The app runs on Posit Connect Cloud (account `danielflow`):

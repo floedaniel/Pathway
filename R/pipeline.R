@@ -7,7 +7,8 @@
 #   data/eppo_commodity_map.csv (category -> FinnPRIO pathway).
 # - Otherwise (no list), both computed pathways are assessed from the host plants
 #   (Major host / Host), as before; labelled in the UI.
-# SSB is queried only for computed pathways.
+# SSB is queried only for computed pathways, and only imports from countries where
+# the pest is present are kept (user's rule, 2026-10-20); ENT3 is their total.
 
 read_commodity_map <- function(file = "data/eppo_commodity_map.csv") {
   utils::read.csv(file, colClasses = "character", encoding = "UTF-8", na.strings = "")
@@ -69,6 +70,9 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
   classified <- classify_hosts(hosts, settings)                      # 3
   groups <- run_groups(classified)                                   # 4
   present <- eppo_present_countries(code, settings)                  # 5
+  # Origin countries for SSB and for Lovdata origin rules: where the pest is present,
+  # Norway (the PRA area itself) excluded.
+  origins <- setdiff(present, "NO")
 
   chosen <- choose_pathways(commodities_fn(code, settings), classified, settings)
   pc <- chosen$pc
@@ -88,9 +92,10 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
     meta <- ssb_metadata(settings)
     years <- ssb_window(settings, meta)
     lines <- dplyr::bind_rows(lapply(computed, function(p) pathway_lines(cn8_table, p, pc$info[[p]])))
-    imports <- ssb_imports(lines, years, settings, meta)
+    # Only imports from countries where the pest is present (user's rule, 2026-10-20)
+    imports <- ssb_imports(lines, years, settings, meta, countries = origins)
     classes <- dplyr::bind_rows(lapply(computed, function(p) {
-      classify_pathway(imports, cn8_table, p, pc$info[[p]], present, settings, years, thresholds)
+      classify_pathway(imports, cn8_table, p, pc$info[[p]], settings, years, thresholds)
     }))
   }
 
@@ -115,7 +120,7 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
     pest_lineage = pest_tax$prefname[pest_tax$type %in% c("Genus", "Subfamily", "Family")],
     host_genera = host_genera,
     groups = groups,
-    countries = unname(country_names_no[present])
+    countries = unname(country_names_no[origins])
   )
   law <- law_search(law_index_fn(settings), terms)
 
@@ -123,7 +128,7 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
     code = code, input = input, pest = overview$prefname, groups = groups,
     pathways = c(computed, pc$manual), pathway_info = pc$info, pathway_source = source,
     commodities = pc$table, other_categories = pc$other,
-    hosts = classified, present_countries = present, country_names = country_names,
+    hosts = classified, present_countries = present, origin_countries = origins, country_names = country_names,
     years = years, imports = imports, classes = classes, law = law, host_search = host_hits,
     fetched = list(
       eppo = attr(present, "fetched_at"),

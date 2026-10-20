@@ -1,18 +1,23 @@
 # ENT3 write-up (Step 9). The text follows a fixed layout (decided 2026-10-20,
 # user's example):
 #
-#   ENT3: Large
+#   ENT3: Small
 #
-#   Annual import into Norway of plants for planting (CN 0602): 19.1 million kg
-#   (median 2016-2025). The figure covers ... so it is an upper bound.
+#   Annual import into Norway of wood (CN 44, 9406.10) from the countries where
+#   the pest is present (Canada, United States of America): 49 145 kg (median
+#   2016-2025). Imports from other countries are not counted. The figure covers
+#   ... so it is an upper bound.
 #
-#   Largest CN8 lines (kg per year, share of total):
-#   stauder ikke spesifisert ... (06029022): 5.7 million kg (30%)
+#   Largest CN8 lines (median kg per year, share of total, kg in total):
+#   paller ... (44152000): 32 526 kg per year (66%), 327 671 kg in total 2016-2025
 #   ...
-#   Imports from countries where the pest is present (information only, not ENT3):
-#   United States of America: 99 kg per year (median 2016-2025)
-#     stiklinger til bruk i gartnerier ..., andre (06021029): 924 kg in total 2016-2025
-#   Canada: no recorded imports
+#   Imports by country:
+#   United States of America: 44 932 kg per year (median 2016-2025)
+#     paller ... (44152000): 306 069 kg in total 2016-2025
+#   No recorded imports from: Mexico
+#
+# Only imports from countries where the pest is present are used (user's rule,
+# 2026-10-20), so the ENT3 class is the class of that total.
 #
 #   Regulation:
 #   Vedlegg 1, nr. 2.1: Agrilus anxius is listed.
@@ -39,8 +44,8 @@ pathway_scope <- function(pathway, lines) {
   }
 }
 
-# Deterministic inputs for one pathway: CN8 line summary, pest-present table and
-# pest-present imports per country and line.
+# Deterministic inputs for one pathway: CN8 line summary, the country table (every
+# pest-present country) and imports per country and line.
 writeup_inputs <- function(r, pathway, cn8_table = read_commodity_cn8()) {
   ent3 <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3", ]
   lines <- pathway_lines(cn8_table, pathway, pinfo(r, pathway))
@@ -48,9 +53,9 @@ writeup_inputs <- function(r, pathway, cn8_table = read_commodity_cn8()) {
   yrs <- seq(span[1], span[2])
   list(
     lines_used = lines,
-    lines = line_summary(r$imports, lines, yrs, r$present_countries, ent3$kg),
-    present = present_origins(r$imports, lines, yrs, r$present_countries, ent3$kg, r$country_names),
-    present_lines = present_by_line(r$imports, lines, yrs, r$present_countries)
+    lines = line_summary(r$imports, lines, yrs, ent3$kg),
+    present = present_origins(r$imports, lines, yrs, origin_countries(r), ent3$kg, r$country_names),
+    present_lines = present_by_line(r$imports, lines, yrs, origin_countries(r))
   )
 }
 
@@ -76,8 +81,14 @@ writeup_text <- function(r, pathway, inputs, regulation) {
   ls <- inputs$lines
   out <- c(paste0("ENT3: ", cls), "")
 
-  out <- c(out, paste0("Annual import into Norway of ", pathway_scope(pathway, inputs$lines_used), ": ",
-                       fmt_mass(ent3$kg), " (", ent3$stat, " ", ent3$years, "). The figure covers all ",
+  pr <- inputs$present
+  where <- if (nrow(pr) <= 5) paste0("the countries where the pest is present (", paste(sort(pr$name), collapse = ", "), ")")
+           else paste0("the ", nrow(pr), " countries where the pest is present")
+  amount <- if (is.na(ent3$kg)) paste0("no recorded imports (", ent3$years, ")")
+            else paste0(fmt_mass(ent3$kg), " (", ent3$stat, " ", ent3$years, ")")
+  out <- c(out, paste0("Annual import into Norway of ", pathway_scope(pathway, inputs$lines_used), " from ", where, ": ",
+                       amount, ". Imports from other countries are not counted.",
+                       if ("NO" %in% r$present_countries) " The pest is also present in Norway.", " The figure covers all ",
                        if (pathway == "wood") "products" else "plants", " in these CN lines, not only host ",
                        if (pathway == "wood") "commodities" else "plants", ", so it is an upper bound."))
   basis <- if (!is.null(r$pathway_info)) pathway_basis(pathway, r) else NULL
@@ -90,27 +101,32 @@ writeup_text <- function(r, pathway, inputs, regulation) {
     lab <- ifelse(is.na(lab) & !is.null(ls), ls$description[match(cn8, ls$cn8)], lab)
     ifelse(is.na(lab), "", paste0(lab, " "))
   }
-  top <- if (is.null(ls)) ls else utils::head(ls[ls$kg > 0, ], 5)
+  top <- if (is.null(ls)) ls else utils::head(ls[ls$kg_total > 0, ], 5)
   if (!is.null(top) && nrow(top) > 0) {
-    out <- c(out, "Largest CN8 lines (kg per year, share of total):",
-             paste0(label_of(top$cn8), "(", top$code, "): ", fmt_mass(top$kg), " (", fmt_share(top$share),
-                    ifelse(mixed_line(top$flags), ", mixed line", ""), ")"), "")
+    out <- c(out, "Largest CN8 lines (median kg per year, share of total, kg in total):",
+             paste0(label_of(top$cn8), "(", top$code, "): ", fmt_mass(top$kg), " per year (", fmt_share(top$share),
+                    ifelse(mixed_line(top$flags), ", mixed line", ""), "), ", fmt_mass(top$kg_total),
+                    " in total ", ent3$years), "")
   }
 
-  out <- c(out, "Imports from countries where the pest is present (information only, not ENT3):")
-  pr <- inputs$present
+  # Countries with imports (largest first, up to max_countries), then the rest in one line
+  max_countries <- 10
   pl <- inputs$present_lines
-  for (i in seq_len(nrow(pr))) {
-    nm <- pr$name[i]
-    if (pr$kg[i] > 0 || any(pl$country == pr$country[i])) {
-      out <- c(out, paste0(nm, ": ", fmt_mass(pr$kg[i]), " per year (median ", ent3$years, ")"))
-      x <- utils::head(pl[pl$country == pr$country[i], ], 3)
-      if (nrow(x) > 0) out <- c(out, paste0("  ", label_of(x$cn8), "(", cn8_code(x$cn8), "): ",
-                                            fmt_mass(x$kg_total), " in total ", ent3$years))
-    } else {
-      out <- c(out, paste0(nm, ": no recorded imports"))
-    }
+  with_imp <- pr$kg > 0 | pr$country %in% pl$country
+  out <- c(out, "Imports by country:")
+  shown <- utils::head(which(with_imp), max_countries)
+  for (i in shown) {
+    out <- c(out, paste0(pr$name[i], ": ", fmt_mass(pr$kg[i]), " per year (median ", ent3$years, ")"))
+    x <- utils::head(pl[pl$country == pr$country[i], ], 3)
+    if (nrow(x) > 0) out <- c(out, paste0("  ", label_of(x$cn8), "(", cn8_code(x$cn8), "): ",
+                                          fmt_mass(x$kg_total), " in total ", ent3$years))
   }
+  if (sum(with_imp) > max_countries) out <- c(out, paste0(sum(with_imp) - max_countries,
+                                                          " further countries with smaller imports (see Panel 1)."))
+  none <- sort(pr$name[!with_imp])
+  if (length(none) > 0) out <- c(out, paste0("No recorded imports from: ", if (length(none) <= 15)
+    paste(none, collapse = ", ") else paste0(paste(utils::head(none, 15), collapse = ", "), " and ",
+                                             length(none) - 15, " more countries")))
   out <- c(out, "", "Regulation:", if (length(regulation)) regulation else "Not found in FOR-2000-12-01-1333.")
 
   notes <- if (!is.null(r$hosts)) pathway_notes(pathway, r) else character()

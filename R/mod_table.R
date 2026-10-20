@@ -1,10 +1,11 @@
 # Panel 1: SSB table summary, one block per selected pathway. Tidy tables, one
-# value per column, median over the statistic years, kg.
-# 1. ENT3: median annual kg over all origins and its class, for all host
-#    commodities of the pathway (row "all_hosts"); group rows are information.
-# 2. Imports from countries where the pest is present (key context, not ENT3):
-#    every pest-present country, with or without recorded imports.
-# 3. Top origins overall.
+# value per column, median over the statistic years, kg. Imports are only those
+# from countries where the pest is present (user's rule, 2026-10-20).
+# 1. ENT3: median annual kg summed over the pest-present countries and its class,
+#    for all host commodities of the pathway (row "all_hosts"); group rows are
+#    information.
+# 2. Imports by country: every pest-present country, with or without imports.
+# 3. CN8 lines of the pathway.
 
 fmt_num <- function(x) ifelse(is.na(x), "-", format(round(x), big.mark = " ", scientific = FALSE, trim = TRUE))
 fmt_pct <- function(x) ifelse(is.na(x), "-", ifelse(x > 0 & x < 0.01, "<1 %", paste0(round(100 * x), " %")))
@@ -16,6 +17,10 @@ class_badge <- function(label, official = TRUE) {
   colour <- switch(label, small = "success", medium = "warning", large = "danger", "secondary")
   shiny::span(class = paste0("badge text-bg-", colour, if (!official) " opacity-75"), label)
 }
+
+# Origin countries of a result: where the pest is present, Norway excluded
+# (results without the field, e.g. in tests, fall back to the present countries).
+origin_countries <- function(r) r$origin_countries %||% setdiff(r$present_countries, "NO")
 
 # Country name from SSB (English); the ISO2 code if SSB has no name.
 country_name <- function(code, country_names) {
@@ -87,21 +92,19 @@ main_line_by_country <- function(imports, lines, stat_years) {
   stats::setNames(top$cn8, top$country)
 }
 
-# Per CN8 line: median annual kg (all origins), share of the pathway total, and
-# median annual kg from pest-present origins.
-line_summary <- function(imports, lines, stat_years, present, total_kg) {
+# Per CN8 line: median annual kg, total kg over the statistic years (sparse lines
+# often have a median of 0) and the share of the pathway total.
+line_summary <- function(imports, lines, stat_years, total_kg) {
   rows <- lapply(seq_len(nrow(lines)), function(i) {
     l <- lines[i, ]
-    tibble::tibble(
-      cn8 = l$cn8, code = cn8_code(l$cn8), description = cn8_text(l), flags = l$flags,
-      kg = stats::median(annual_totals(imports, l, stat_years)$quantity),
-      kg_pest_present = stats::median(annual_totals(imports, l, stat_years, "pest_present", present)$quantity)
-    )
+    q <- annual_totals(imports, l, stat_years)$quantity
+    tibble::tibble(cn8 = l$cn8, code = cn8_code(l$cn8), description = cn8_text(l), flags = l$flags,
+                   kg = stats::median(q), kg_total = sum(q))
   })
   out <- dplyr::bind_rows(rows)
   if (nrow(out) == 0) return(out)
   out$share <- if (is.na(total_kg) || total_kg == 0) NA_real_ else out$kg / total_kg
-  out[order(-out$kg, -out$kg_pest_present), ]
+  out[order(-out$kg, -out$kg_total), ]
 }
 
 # Per pest-present country and CN8 line: total kg over the statistic years and the
@@ -115,18 +118,6 @@ present_by_line <- function(imports, lines, stat_years, present) {
                           years_with_imports = dplyr::n_distinct(year[kg > 0]), .groups = "drop")
   out <- out[out$kg_total > 0, ]
   out[order(out$country, -out$kg_total), ]
-}
-
-# Top origins overall, with each origin's largest CN8 line.
-origin_summary <- function(imports, lines, stat_years, present, country_names = character(), top_n = 10) {
-  m <- country_medians(imports, lines, stat_years)
-  m <- m[m$kg > 0 | m$value_nok > 0, ]
-  m$name <- country_name(m$country, country_names)
-  m$pest_present <- m$country %in% present
-  main <- unname(main_line_by_country(imports, lines, stat_years)[m$country])
-  m$main_cn8 <- cn8_code(main)
-  m$main_description <- cn8_description(main, lines)
-  utils::head(m[order(-m$kg), c("name", "country", "kg", "value_nok", "pest_present", "main_cn8", "main_description")], top_n)
 }
 
 # Every pest-present country: median kg/year, share of the pathway total, years with
@@ -206,22 +197,23 @@ class_rows_ui <- function(cl) {
   if (sum(cl$role == "info") < 2) cl <- cl[cl$role == "ent3", ]  # one group: info row would repeat ENT3
   rows <- lapply(seq_len(nrow(cl)), function(i) list(
     group_label[[cl$group[i]]], fmt_num(cl$kg[i]), class_badge(cl$class[i], official = cl$role[i] == "ent3")))
-  simple_table(c("Host commodities", paste0(cl$stat[1], " kg/year, all origins, ", cl$years[1]), "ENT3 class"),
+  simple_table(c("Host commodities", paste0(cl$stat[1], " kg/year from pest-present countries, ", cl$years[1]), "ENT3 class"),
                rows, right = 2)
 }
 
 present_ui <- function(r, lines, stat_years, total_kg) {
-  po <- present_origins(r$imports, lines, stat_years, r$present_countries, total_kg, r$country_names)
+  po <- present_origins(r$imports, lines, stat_years, origin_countries(r), total_kg, r$country_names)
   with_imp <- po[po$kg > 0, ]
   without <- po[po$kg == 0, ]
   shiny::tagList(
-    shiny::h6(class = "mt-3", paste0("Imports from countries where the pest is present (median kg/year ",
+    shiny::h6(class = "mt-3", paste0("Imports by country where the pest is present (median kg/year ",
                                      min(stat_years), "-", max(stat_years), ")")),
     shiny::p(class = "small text-muted mb-1", paste0(
-      fmt_num(sum(po$kg)), " kg/year from ", nrow(with_imp), " of ", nrow(po), " pest-present countries (",
-      fmt_pct(if (is.na(total_kg) || total_kg == 0) NA else sum(po$kg) / total_kg), " of all imports). Context, not ENT3.")),
+      "Recorded imports from ", nrow(with_imp), " of the ", nrow(po), " countries where the pest is present",
+      if ("NO" %in% r$present_countries) " (Norway, where the pest is also present, is not an origin)", ". ",
+      "Imports from other countries are not used.")),
     if (nrow(with_imp) > 0) simple_table(
-      c("Country", "ISO", "kg/year", "Share of all imports", "NOK/year",
+      c("Country", "ISO", "kg/year", "Share", "NOK/year",
         paste0("Years with imports (of ", length(stat_years), ")"), "Main CN8 code", "Main CN8 description"),
       lapply(seq_len(nrow(with_imp)), function(i) list(
         with_imp$name[i], with_imp$country[i], fmt_num(with_imp$kg[i]), fmt_pct(with_imp$share[i]),
@@ -233,25 +225,15 @@ present_ui <- function(r, lines, stat_years, total_kg) {
   )
 }
 
-origins_ui <- function(r, lines, stat_years) {
-  o <- origin_summary(r$imports, lines, stat_years, r$present_countries, r$country_names)
-  if (nrow(o) == 0) return(shiny::p("No imports recorded."))
-  simple_table(c("Country", "ISO", "kg/year", "NOK/year", "Pest present", "Main CN8 code", "Main CN8 description"),
-    lapply(seq_len(nrow(o)), function(i) list(
-      o$name[i], o$country[i], fmt_num(o$kg[i]), fmt_num(o$value_nok[i]),
-      if (o$pest_present[i]) shiny::span(class = "text-danger", "yes") else "no",
-      shiny::tags$code(o$main_cn8[i]), o$main_description[i])),
-    right = 3:4)
-}
-
 lines_ui <- function(r, lines, stat_years, total_kg) {
-  ls <- line_summary(r$imports, lines, stat_years, r$present_countries, total_kg)
-  used <- ls[ls$kg > 0 | ls$kg_pest_present > 0, ]
+  ls <- line_summary(r$imports, lines, stat_years, total_kg)
+  used <- ls[ls$kg_total > 0, ]
   shiny::tagList(
-    simple_table(c("CN8", "Description", "kg/year", "Share of total", "From pest-present origins (kg/year)", "Flags"),
+    if (nrow(used) > 0) simple_table(c("CN8", "Description", "kg/year (median)", "Share of total",
+                                       paste0("kg in total ", min(stat_years), "-", max(stat_years)), "Flags"),
       lapply(seq_len(nrow(used)), function(i) list(
         shiny::tags$code(used$code[i]), used$description[i], fmt_num(used$kg[i]),
-        fmt_pct(used$share[i]), fmt_num(used$kg_pest_present[i]), gsub(";", ", ", used$flags[i]))), right = 3:5),
+        fmt_pct(used$share[i]), fmt_num(used$kg_total[i]), gsub(";", ", ", used$flags[i]))), right = 3:5),
     if (nrow(ls) > nrow(used)) shiny::p(class = "small text-muted", paste0(
       "No recorded imports on ", nrow(ls) - nrow(used), " further line(s): ",
       paste(ls$code[!(ls$cn8 %in% used$cn8)], collapse = ", "), "."))
@@ -288,7 +270,6 @@ pathway_block_ui <- function(p, r, cn8_table, settings) {
                                                                min(stat_years), "-", max(stat_years), ")")),
                         lines_ui(r, lines, stat_years, total)),
     shiny::div(class = "alert alert-warning py-2", lapply(pathway_notes(p, r), shiny::p, class = "mb-1")),
-    shiny::tags$details(open = NA, shiny::tags$summary("Top origins (all countries)"), origins_ui(r, lines, stat_years)),
     if (!is.na(bark)) shiny::p(class = "small text-muted",
       paste0("Information only: round wood with bark, median ", fmt_num(bark), " kg/year (not ENT3)."))
   )
@@ -314,7 +295,7 @@ mod_table_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::uiOutput(ns("summary")),
-    shiny::p(class = "small text-muted", "'none recorded' means no imports in the data; you decide. All quantities in kg."),
+    shiny::p(class = "small text-muted", "Only imports from countries where the pest is present (EPPO) are used. 'none recorded' means no such imports in the data; you decide. All quantities in kg."),
     shiny::downloadButton(ns("csv"), "Download CSV", class = "btn-sm")
   )
 }

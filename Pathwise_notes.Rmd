@@ -30,8 +30,8 @@ Working agreements (from the user):
 ## Status
 
 - **App:** complete for v1. Single input, four panels, LLM write-up. All 318 test pests run through the pipeline without R errors (final debugging pass, decision 45).
-- **Tests:** 233 offline tests pass (`testthat::test_dir("tests/testthat")`).
-- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `a11a7bf` (later commits change only documentation).
+- **Tests:** 238 offline tests pass (`testthat::test_dir("tests/testthat")`).
+- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `a11a7bf`. **Not yet deployed:** the pest-present-only change (decision 52); redeploy with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
   - Dashboard: https://connect.posit.cloud/danielflow/content/01a158ac-9fd3-b5d5-8776-1d40f1995348
@@ -41,6 +41,8 @@ Working agreements (from the user):
 
 Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant commodity is traded into the PRA area annually?", for Norway.
 
+**Core rule (user, 2026-10-20, decision 52):** only SSB imports from the countries where the pest is present (EPPO distribution) are used, for every pest. *A. anxius*: Canada and USA, nothing else. Norway is never an origin.
+
 **Input:** one centred field, "EPPO code or scientific name" (e.g. `AGRLAX` or `Agrilus anxius`), and Run. No checkboxes; the pathways shown are the ones derived for the pest.
 
 **Flow** (`run_assessment()` in `R/pipeline.R`):
@@ -49,27 +51,27 @@ Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant comm
 2. **EPPO host commodities:** scraped from `gd.eppo.int/taxon/{code}/pathwayshosts` (no API endpoint), cached 30 days. Category + host genus per row.
 3. **Hosts:** EPPO hosts, classes Major host and Host only. Stops: no hosts; no Major host/Host.
 4. **Classify hosts** from the EPPO taxonomy lineage: conifer / non_conifer / not_plant, plus family, genus and monocot flag. No plant host -> stop.
-5. **Present countries:** EPPO distribution statuses starting with "Present". None -> stop.
+5. **Present countries:** EPPO distribution statuses starting with "Present". None -> stop. Origin countries = present countries minus Norway (`origins`, returned as `r$origin_countries`).
 6. **Choose pathways** (`choose_pathways()`): from the host-commodity list via `data/eppo_commodity_map.csv`; if the list is empty or gives no computed pathway (e.g. soil only), fall back to host plants, labelled in the header.
-7. **SSB 08801:** imports (kg, NOK) of the pathway's CN8 lines, all origin countries, 10 years (2016-2025). Median annual kg over all origins -> FinnPRIO class.
+7. **SSB 08801:** imports (kg, NOK) of the pathway's CN8 lines, 10 years (2016-2025), only from the origin countries (`ssb_imports(countries = origins)`: fetched and cached for all origins so pests share the cache, filtered right away). Median annual kg summed over those countries -> FinnPRIO class.
 8. **Host search in SSB:** every 08801 label is searched for each host genus (Latin and Norwegian names), every hit listed with its status.
-9. **Lovdata:** units of FOR-2000-12-01-1333 naming the pest, then origin rules (host genus + pest-present country), then host-only units.
+9. **Lovdata:** units of FOR-2000-12-01-1333 naming the pest, then origin rules (host genus + pest-present country, Norway excluded), then host-only units.
 10. **Write-up:** fixed layout filled by R; the LLM writes one sentence per Lovdata unit.
 
 **Stops** are typed conditions (`stop_app()` in `R/conditions.R`) shown as one red alert; nothing else renders and no LLM call is made. Messages: invalid_code, no_hosts, no_main_minor, no_plant_hosts, no_distribution, unit_mismatch ("expected kg"), no_pathway, missing_secret, bad_config.
 
 **Screen:**
 
-- **Header strip:** pest and code, where pathways come from (EPPO host commodities with count, or host plants with the reason), host counts (conifer / non-conifer / not plants), number of present countries, years.
-- **Panel 1, SSB table:** per pathway one block.
-  - Class rows: `All host commodities (ENT3)` = median kg/year over all origins and the class; columns: host commodities | median kg/year | ENT3 class | kg from pest-present origins | share. Conifer / non-conifer group rows only when both groups exist (information).
+- **Header strip:** pest and code, where pathways come from (EPPO host commodities with count, or host plants with the reason), host counts (conifer / non-conifer / not plants), "SSB imports only from the N countries where the pest is present" (plus "also present in Norway" when so), years.
+- **Panel 1, SSB table:** per pathway one block, all numbers from pest-present countries only.
+  - Class rows: `All host commodities (ENT3)` = median kg/year from pest-present countries and the class; columns: host commodities | median kg/year from pest-present countries | ENT3 class. Conifer / non-conifer group rows only when both groups exist (information).
+  - "Imports by country where the pest is present": Country | ISO | kg/year | Share | NOK/year | Years with imports (of N) | Main CN8 code | Main CN8 description; countries without imports listed below.
+  - "CN8 lines in this pathway": code, tariff description, median kg/year, share, kg in total over the 10 years (sparse lines have median 0), flags.
   - Notes on the basis (EPPO list or fallback) and upper bounds.
-  - "CN8 lines in this pathway": code, tariff description, median kg/year, share, kg from pest-present origins, flags.
-  - Pest-present origins table: Country | ISO | kg/year | Share | NOK/year | Years with imports (of N) | Main CN8 code | Main CN8 description; countries without imports listed.
-  - Top origins (open by default), same tidy columns plus "Pest present" yes/no.
   - Wood: with-bark subtotal (information).
+  - Removed with decision 52: "Top origins (all countries)", the pest-present kg/share columns.
   - "Host search in SSB table 08801": CN8 code | Valid | SSB label | Host | Matched term | Status.
-- **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Switch: all origins / pest-present origins only. Caption explains the bars. PNG download. No "*" marker (removed on request).
+- **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom. Only pest-present countries. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Caption explains the bars. (The all/pest-present switch was removed with decision 52.) PNG download. No "*" marker (removed on request).
 - **Panel 3, Lovdata:** snippets with id (e.g. "Vedlegg 2, nr. 10"), link, copy button.
 - **Panel 4, FinnPRIO write-up:** per computed pathway an editable text box, Copy, Regenerate, labelled with its source (model or fallback).
 - **Derived inputs** (collapsed): present countries, EPPO host-commodity table (category, host, EPPO code, FinnPRIO pathway, status), host plant table.
@@ -114,10 +116,10 @@ Fallback (no EPPO list, or a list with only info categories such as soil): both 
 
 ### Volume class (`R/volume_class.R`)
 - `data/finnprio_thresholds.csv`: `x < 1,000,000` small; `x <= 10,000,000` medium; else large. kg only.
-- Aggregate all origins per year first, then the median over 10 years, then classify.
+- Imports are only from pest-present countries (Norway excluded). Sum those countries per year first, then the median over 10 years, then classify.
 - `all_hosts` row (union of lines, role `ent3`) is the ENT3 answer; group rows are info.
-- No imports -> "none recorded" (not `non_existent`); the assessor decides.
-- Pest-present imports are shown as kg and share, never as a class (Class B removed, decision 29).
+- No imports from those countries -> "none recorded" (not `non_existent`); the assessor decides.
+- History: first all origins (Class A) + pest-present class (Class B); then all origins + pest-present kg/share as context (decision 29); now pest-present countries only (decision 52).
 
 ### Host search in SSB (`R/host_search.R`, decision 47)
 - User's rule: always search SSB 08801 for the host plants (e.g. bjørk for *A. anxius*).
@@ -127,25 +129,26 @@ Fallback (no EPPO list, or a list with only info categories such as soil): both 
 
 ### Lovdata (`R/law_index.R`)
 - Bulk archive `gjeldende-sentrale-forskrifter.tar.bz2` (21 MB), file `sf/sf-20001201-1333.xml`, parsed into 305 units (§ articles, annex rows, annex paragraphs). Cached 7 days.
-- Terms: pest names + EPPO synonyms; higher taxa only as "<taxon> spp." (genus alone is no hit); aliases in `data/law_taxon_aliases.csv` (Scolytinae -> Scolytidae; Pinopsida -> Coniferales / bartrær); host genera; Norwegian country names of pest-present countries.
+- Terms: pest names + EPPO synonyms; higher taxa only as "<taxon> spp." (genus alone is no hit); aliases in `data/law_taxon_aliases.csv` (Scolytinae -> Scolytidae; Pinopsida -> Coniferales / bartrær); host genera; Norwegian country names of pest-present countries (Norway excluded).
 - Tiers: pest_match, then origin_rule (host genus + pest-present country), then host only.
 
 ### Write-up (`R/prompts.R`, `R/mod_writeup.R`, decisions 40, 46)
 Fixed layout, numbers and codes filled by R:
 
 ```text
-ENT3: Large
+ENT3: Small
 
-Annual import into Norway of <scope>: 19.1 million kg (median 2016-2025). The figure covers all ... so it is an upper bound.
+Annual import into Norway of <scope> from the countries where the pest is present (<names>, or "the N countries ..." when more than 5): <mass> (median 2016-2025). Imports from other countries are not counted.[ The pest is also present in Norway.] The figure covers all ... so it is an upper bound.
 <basis sentence>
 
-Largest CN8 lines (kg per year, share of total):
-<tariff label> (<code>): <mass> (<share>[, mixed line])
+Largest CN8 lines (median kg per year, share of total, kg in total):
+<tariff label> (<code>): <mass> per year (<share>[, mixed line]), <mass> in total 2016-2025
 
-Imports from countries where the pest is present (information only, not ENT3):
+Imports by country:
 <Country>: <mass> per year (median 2016-2025)
   <tariff label> (<code>): <mass> in total 2016-2025
-<Country>: no recorded imports
+[N further countries with smaller imports (see Panel 1).]   (more than 10 countries with imports)
+No recorded imports from: <countries>                         (first 15, then "and N more countries")
 
 Regulation:
 <Lovdata id>: <one LLM sentence>
@@ -155,6 +158,7 @@ Note: <pathway notes>
 
 - The LLM (OpenAI, `gpt-5.5-2026-04-23`) writes only the Regulation lines: one sentence per unit, each must start with a Panel 3 id (`validate_regulation()`); otherwise the unit text is shown (`regulation_fallback()`). Cached per units + model; Regenerate bypasses the cache.
 - Units: those naming the pest, then origin rules, in regulation order.
+- No imports at all: "ENT3: none recorded" and "...: no recorded imports (2016-2025)".
 
 ## Code map
 
@@ -185,7 +189,7 @@ Note: <pathway notes>
 
 - `README.md`: user guide (quick start, keys, panels, method, caveats, sources, deployment).
 - `docs/vignette.md`: worked example, AGRLAX step by step, real numbers from a run on 2026-10-20. Markdown, not R Markdown, because rmarkdown is not in the project library. Re-run and update the numbers if the method changes.
-- `docs/decisions.md`: decisions 1-51 (49 front page and graph, 50 deployment, 51 documentation).
+- `docs/decisions.md`: decisions 1-52 (49 front page and graph, 50 deployment, 51 documentation, 52 pest-present countries only).
 - `docs/findings.md`.
 - Reference copies: `docs/reference/eppo_gd_general_user-guide.pdf`, `docs/reference/tolltariffstruktur.json`.
 
@@ -212,7 +216,8 @@ Note: <pathway notes>
 ## Known limitations
 
 - Import statistics are recorded trade, not pest pressure or entry.
-- CN8 lines cover whole commodity groups, so most classes come out `large` (upper bound). Pest-present share helps judge relevance.
+- CN8 lines cover whole commodity groups, so classes are an upper bound for the host-specific volume.
+- Only countries EPPO records as "Present" count: gaps in the EPPO distribution and re-exports through third countries are missed.
 - Conifer plants for planting appear only in catch-all 0602 lines.
 - Most wood packaging travels with other goods and has no SSB line (4415 = packaging traded as goods).
 - Manufactured articles are partial (4416, 9406.10 only); veneer 4408, plywood 4412, profiled wood 4409 show up in the host search as "outside scope" (Open question 5).
@@ -235,9 +240,11 @@ Note: <pathway notes>
 
 ## Results worth remembering
 
-- **AGRLAX (*Agrilus anxius*), run 2026-10-20 (full walk-through in `docs/vignette.md`):** plants for planting 35.3 million kg/year (large), 949 kg from CA/US; wood 291.9 million kg/year (large), 49 t from CA/US. 17 Lovdata units. Only 6 SSB lines are birch-specific.
+- **AGRLAX (*Agrilus anxius*), pest-present only (decision 52; walk-through in `docs/vignette.md`):** plants for planting 949 kg/year (small; 06029021 81 %), wood 49 144 kg/year (small; pallets 66 %, crates 29 %). 17 Lovdata units (2 pest, 5 origin rules). Only 6 SSB lines are birch-specific; of them only sawn birch had imports from CA/US (31 kg in total).
+- **AGRLAX before decision 52 (all origins):** plants 35.3 million kg/year, wood 291.9 million kg/year, both large.
+- **IPSXTY:** present in 44 countries incl. Norway (43 origins); plants 17.4 million kg (large), wood 435.2 million kg (large, Sweden 343 million kg/year). **XYLEFA:** 22 countries, plants 1.9 million kg (medium).
 - **AGRLAX, earlier:** hosts all *Betula*, present in CA and US. EPPO list: plants for planting, squared and non-squared wood, bark, manufactured articles, packaging, all *Betula*. Before the genus filter 90 % of "non-conifer wood from pest-present countries" was oak; with it ~47 t/year (mostly pallets) instead of 5.3 million kg. Lovdata: Vedlegg 1 nr. 2.1 (pest), Vedlegg 4A nr. 45, origin rule Vedlegg 3 nr. 11 (*Betula* from Canada and USA).
-- **IPSXCA wood:** total 1.26 billion kg; pest-present origins 0.43 million kg.
+- **IPSXCA wood (before decision 52):** all origins 1.26 billion kg; pest-present origins 0.43 million kg.
 - **Sweep of 318 pests:** 215 get pathways from EPPO host commodities, the rest from host plants. XANTPD stops (no hosts in EPPO), which is correct.
 
 ## History (commits)
@@ -251,7 +258,8 @@ Note: <pathway notes>
 7. Pathways from EPPO host commodities; single input; checkboxes removed.
 8. Customs tariff wording (06029021 fix); final debugging pass; host search in SSB; UI clean-ups (footer text, "*" marker, legend with codes).
 9. Posit Connect Cloud: manifest, deploy script, published.
-10. Notes rewritten as project memory; README, vignette (`docs/vignette.md`), decisions 49-51 and findings updated.
+10. Notes rewritten as project memory; README, vignette (`docs/vignette.md`), decisions 49-51 and findings updated. `old_scripts/` deleted.
+11. Decision 52: imports only from countries where the pest is present (Norway excluded); Panel 1, graph and write-up reworked; docs updated.
 
 Plan steps not done: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; effectively replaced by Connect Cloud). See Open questions 2 and 3.
 
@@ -306,7 +314,7 @@ Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`
 
 # Appendix A: Original plan (2026-10-20, superseded where Part 1 or docs/decisions.md differ)
 
-Main changes since: single input is a code OR a name; pathways come from EPPO host commodities; woody list replaced by the taxonomic rule; kg only (no pc); median over 10 years; Class B replaced by pest-present kg and share; fixed pathways (hitchhiking etc.) removed; OpenAI instead of Claude/HF; write-up in a fixed layout with the LLM only for regulation sentences; footer disclaimers and the graph "*" removed; deployed on Posit Connect Cloud instead of a laptop.
+Main changes since: single input is a code OR a name; pathways come from EPPO host commodities; woody list replaced by the taxonomic rule; kg only (no pc); median over 10 years; Class B replaced by pest-present kg and share; fixed pathways (hitchhiking etc.) removed; OpenAI instead of Claude/HF; write-up in a fixed layout with the LLM only for regulation sentences; footer disclaimers and the graph "*" removed; deployed on Posit Connect Cloud instead of a laptop; ENT3 from pest-present countries only (not the total of all origins).
 
 read whole plan before you start!
 Also see old_scripts for old snippets that can be re used (folder deleted 2026-10-20)

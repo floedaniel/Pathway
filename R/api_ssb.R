@@ -73,8 +73,13 @@ ssb_fetch_chunk <- function(cn8, years) {
 }
 
 # Imports for the given CN8 lines over `years`, chunked and cached per chunk.
+# countries: origin countries to keep (ISO2). The app passes the countries where
+# the pest is present (user's rule, 2026-10-20: only SSB data from those
+# countries). Chunks are fetched for all origins and cached that way, so the
+# cache is shared between pests; the filter is applied here, before anything
+# else sees the data. NULL keeps every origin.
 ssb_imports <- function(lines, years, settings, meta = ssb_metadata(settings),
-                        fetch_chunk = ssb_fetch_chunk) {
+                        fetch_chunk = ssb_fetch_chunk, countries = NULL) {
   ssb_check_units(lines, meta)
   codes <- sort(unique(lines$cn8))
   chunks <- split(codes, ceiling(seq_along(codes) / ssb_chunk_size))
@@ -82,6 +87,7 @@ ssb_imports <- function(lines, years, settings, meta = ssb_metadata(settings),
     cached("ssb", list("08801", "kg+nok", ch, years), function() fetch_chunk(ch, years), settings)
   })
   out <- dplyr::bind_rows(lapply(entries, `[[`, "value"))
+  if (!is.null(countries)) out <- out[out$country %in% countries, ]
   structure(out, fetched_at = min(do.call(base::c, lapply(entries, `[[`, "fetched_at"))))
 }
 

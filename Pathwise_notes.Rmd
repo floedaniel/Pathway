@@ -213,3 +213,4 @@ Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
 2. **Step 11 (model comparison).** The plan compared Claude and 2-3 Hugging Face models. With OpenAI chosen, still wanted, or skip?
 3. **Step 12 (deploy on the second laptop with a Cloudflare tunnel).** Go ahead when you are ready, or later?
 
+4. **Pathways from EPPO host commodities** (feasibility in chat 2026-10-20): use the EPPO GD host-commodity list to choose pathways and CN8 lines automatically, with one input (EPPO code or name). Needs: OK to read the GD web page (no API endpoint), and the EPPO category -> FinnPRIO pathway -> CN8 mapping. Go ahead?

@@ -316,6 +316,28 @@ Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`
 6. **`library(config)` in app.R.** It masks `base::get` and `base::merge` and prints a warning at start; the app does not need it. Remove it?
 7. **Access to the online app.** It is public (anyone with the link, using your EPPO and OpenAI keys). Keep it public, restrict it in the Connect Cloud dashboard, or add a password?
 
+### Next step: more host groups (feasibility report 2026-10-20, no code yet)
+Background: only plants for planting and wood are computed today. Counts from the EPPO host-commodity lists of the 318 test pests (222 have a list):
+
+| EPPO category | FinnPRIO pathway | Pests | Main hosts | Customs chapters |
+|---|---|---|---|---|
+| cut flowers or branches | other_plant_parts | 75 | Citrus (24), Pinus/Picea/Abies (17), Quercus, Vitis | 0603, 0604 (incl. Christmas trees) |
+| fruits or vegetables | food_fodder | 56 | Citrus (16), tomato (12), potato (9), aubergine (8), Prunus, Pyrus, Malus, mango, Capsicum, cucurbits | 07, 08 |
+| seeds | seeds | 23 | maize, groundnut, cotton, rice, grasses | 1209, 1005 10, 1201 10 ... |
+| stored products / pollen | food_fodder / other_plant_parts | 3 / 1 | | |
+
+134 pests have at least one category that is not computed; for 19 nothing is computed today; 24 have Solanum in such a category. EPPO often lists food hosts as species (Solanum lycopersicum, S. tuberosum), so the CN8 table needs species-level matching, not only genus.
+
+Proposed order (my recommendation): (1) seed potatoes 0701 10 in plants for planting; (2) food and fodder, pilot on Solanum (tomato, potato, aubergine) + Capsicum, checked on Tuta absoluta, ToBRFV, Ralstonia, Clavibacter sepedonicus, Epitrix, then all fresh fruit and vegetables; (3) cut flowers, foliage and branches (incl. Christmas trees); (4) seeds.
+
+8. **Order of work.** Go ahead in the order above (pilot on tomato/potato within food and fodder), or another order (tomato/potato only, or all categories at once)?
+9. **Seed potatoes (gap found).** Seed potatoes are CN 0701 10, not 0602. For a pest with "plants for planting of Solanum tuberosum" the app counts the mixed 0602 lines and misses seed potatoes. Fix first: add 0701 10 to plants for planting, counted only for potato hosts?
+10. **Processing state for food and fodder.** Count only fresh or chilled products (e.g. 0701, 0702, 0805), or also frozen (0710) and dried (0712)? My suggestion: fresh/chilled only (living material carries the pest).
+11. **Seeds unit.** FinnPRIO assesses seeds in pieces; SSB 08801 gives kg. (a) use kg anyway, (b) convert with a thousand-seed weight per crop (needs a reviewed table), or (c) keep seeds manual?
+12. **Pests without an EPPO list.** Today they get plants for planting and wood from their host plants. For food and fodder and cut branches: (a) use only codes that name a host species (e.g. 0702 tomatoes for a tomato host), (b) all codes of the chapter as an upper bound, or (c) not computed without an EPPO list?
+13. **Thresholds.** Are the ENT3 kg limits (small < 1 million, medium <= 10 million, else large) the same for food and fodder, cut flowers/branches and seeds?
+14. **Crop name table.** To map tariff wording to hosts ("tomater" -> Solanum lycopersicum, "poteter" -> S. tuberosum), the build script needs a Norwegian crop name -> Latin name table (draft from the tariff, about 150 fruit and vegetable lines, ~30 cut flower/foliage lines). OK that I draft it and you review it before it is used?
+
 # Appendix A: Original plan (2026-10-20, superseded where Part 1 or docs/decisions.md differ)
 
 Main changes since: single input is a code OR a name; pathways come from EPPO host commodities; woody list replaced by the taxonomic rule; kg only (no pc); median over 10 years; Class B replaced by pest-present kg and share; fixed pathways (hitchhiking etc.) removed; OpenAI instead of Claude/HF; write-up in a fixed layout with the LLM only for regulation sentences; footer disclaimers and the graph "*" removed; deployed on Posit Connect Cloud instead of a laptop; ENT3 from pest-present countries only (not the total of all origins).

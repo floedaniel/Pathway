@@ -1,0 +1,29 @@
+# Pathwise settings. Read with load_settings() in R/settings.R.
+# Thresholds, CN8 lines, country exceptions and woody taxa live in data/*.csv, not here.
+
+default:
+  # EPPO host statuses kept for the assessment (fixed, no UI toggle)
+  host_status: [main, minor]
+
+  # SSB 08801: table and graph cover this many years back from the latest complete year
+  ssb_years: 10
+  # ENT3 statistic: volume_stat over the last volume_n complete years
+  volume_n: 5
+  volume_stat: mean
+
+  llm:
+    provider: claude        # claude | hf
+    model: null             # set in Step 9
+    hf_base_url: https://router.huggingface.co/v1
+
+  language: null            # "no" | "en", set in Step 9
+
+  cache:
+    dir: cache
+    # Time to live in days per source. null = never expires.
+    ttl_days:
+      eppo: 30
+      eppo_taxonomy: null
+      ssb: 30
+      lovdata: 7
+      llm: null

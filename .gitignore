@@ -1,0 +1,34 @@
+# Secrets: keys live in ~/.Renviron only, never in the repo
+.Renviron
+.Renviron.*
+*.key
+*api_key*
+*apikey*
+*credentials*
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.nb.html
+
+# renv: keep lockfile, activate.R and settings, ignore libraries
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/sandbox/
+renv/staging/
+
+# Runtime cache (API responses, LLM output)
+cache/
+
+# Large downloaded Lovdata archive; the parsed index is built locally
+data/law/*.tar.bz2
+data/law/raw/
+
+# Plot / table exports
+*.png
+!docs/**/*.png

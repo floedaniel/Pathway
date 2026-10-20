@@ -1,0 +1,175 @@
+---
+title: "Pathwise Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Plan: Pathwise, pest import risk Shiny app (R)
+
+read whole plan before you start!
+Also see \old_scripts for old snippets that can be re used  
+
+## Goal
+Single input: EPPO code of the pest (e.g. XYLEFA). Everything else is derived.
+Outputs, as four panels in this order:
+1. SSB data table summary (with FinnPRIO ENT3 volume classes)
+2. SSB graph (10 years)
+3. Lovdata snippets
+4. Write-up for FinnPRIO, copy-paste ready
+
+## Scope
+v1: woody hosts only (conifer, broadleaf). Commodities: plants for planting (CN8 list).
+v2 (later): herbaceous hosts, crops, true seeds (unit pc). Out of scope now.
+Hosts classified `other` or herbaceous are ignored for the CN8 pull.
+
+## FinnPRIO ENT3
+Question: "How large a volume of the considered host plant commodity is traded into the PRA area annually?"
+Classes (exact option names): `non_existent`, `small`, `medium`, `large`.
+- small: < 1 million kg or pc
+- medium: 1-10 million kg or pc (inclusive)
+- large: > 10 million kg or pc
+- Official ENT3 = total volume into the PRA area regardless of place of origin.
+- Non-existent applies when the pathway is hitchhiking, natural spread or intentional introduction. The app assumes plants for planting, so this is a manual override only.
+- True seeds are assessed in pieces (v2).
+
+## Two classes, both shown
+- **Class A (total, official ENT3):** all origins summed. Drives the write-up by default.
+- **Class B (pest-present origins only):** subset of origins where EPPO status is present. Labelled "informational, not ENT3". Shown in Panel 1 and marked in the graph.
+- Write-up reports Class A as the ENT3 answer and mentions Class B in one sentence if it differs from A.
+- If A and B differ, Panel 1 flags it.
+
+## Principles
+- EPPO, SSB and Lovdata outputs are deterministic and shown separately. Never LLM-generated.
+- Volume classification is deterministic. The LLM must not reclassify or recompute.
+- LLM only sees retrieved text, must cite Lovdata paragraph ids, must say "not found" if absent.
+- LLM output is labelled as generated.
+- Cache everything on disk, fetch date shown in UI.
+- Secrets in env vars only: EPPO_KEY, HF_TOKEN, ANTHROPIC_API_KEY.
+- Plots: ggplot2 with viridis scales.
+- UI states that import stats show recorded trade, not pest pressure or entry, and that CN8 lines cover whole commodity groups, so classes are an upper bound for host-specific volume.
+- Settings in config.yml (host status filter, ssb_years, volume_n, volume_stat, LLM provider/model, language).
+- Never guess thresholds, codes, mappings or FinnPRIO form fields. Take them from tables/templates I fill in.
+
+## Structure
+app.R
+R/mod_input.R, mod_table.R, mod_graph.R, mod_law.R, mod_writeup.R
+R/api_eppo.R, api_ssb.R, volume_class.R, classify_hosts.R, host_to_groups.R,
+R/law_index.R, llm_provider.R, cache.R, prompts.R, conditions.R
+data/commodity_cn8.csv              (cn8, description, commodity_group, valid_from, valid_to, notes)
+data/country_map.csv                (ISO2, EPPO code, SSB name, Norwegian name)
+data/finnprio_thresholds.csv        (see below)
+data/finnprio_writeup_template.txt  (FinnPRIO form fields, order, max length; filled in by me)
+data/law/                           (Lovdata XML + index)
+config.yml
+tests/testthat/
+
+## data/finnprio_thresholds.csv
+commodity_group,unit,small_max,medium_max,source,reviewed
+*,kg,999999,10000000,FinnPRIO ENT3,2026-10-20
+*,pc,999999,10000000,FinnPRIO ENT3,2026-10-20
+(`*` = applies to all groups. Boundaries: <1,000,000 small; 1,000,000-10,000,000 medium; >10,000,000 large. Group-specific rows override `*`.)
+
+## Flow
+1. Validate code: `/taxon/{code}` must exist and be a pest.
+   Else STOP: "Unknown or non-pest EPPO code."
+2. Hosts: `/taxon/{code}/hosts`, keep status `main` + `minor` (fixed in config, no UI toggle).
+   - No hosts at all -> STOP: "No hosts registered in EPPO for {code}. No assessment possible."
+   - No main/minor hosts -> STOP: "No main or minor hosts registered."
+3. `classify_hosts()`: per host, walk taxonomy lineage.
+   - Pinopsida -> `conifer`
+   - Magnoliopsida/angiosperm (woody) -> `broadleaf`
+   - Else -> `other` (ignored)
+   Cached permanently per host code.
+4. `host_to_groups(host_code)` returns a set of commodity groups. v1: from lineage.
+   Union over hosts = groups for the run.
+   - Empty -> STOP: "No hosts covered by current commodity groups (v1: woody plants)."
+5. Distribution: countries with status present only. Absent/eradicated/transient excluded.
+   - None -> STOP: "No present-country records in EPPO."
+6. Pest-present countries mapped to SSB names via `country_map.csv`. Used for Class B, marking in table/graph, and the Lovdata search. They do NOT restrict the SSB query.
+7. SSB: CN8 lines for the groups, ALL origin countries, x years.
+   - Years: fixed 10 years back from the latest complete year (`ssb_years: 10`), for table and graph.
+   - Per group, annual quantity summed over (A) all origins and (B) pest-present origins.
+   - Class A and Class B from `finnprio_thresholds.csv`.
+   - Statistic from config (`volume_n: 5`, `volume_stat: mean`) within the 10 years. Panel 1 also shows latest year and max for both A and B. Flag when statistics land in different classes.
+   - kg and pc are never summed. A group with both units is classified per unit and both are shown.
+   - Unit not kg or pc -> STOP: "Unit mismatch for {group}: SSB {x}, expected kg or pc."
+   - No thresholds for a unit -> "not classified", warning in UI.
+   - No imports -> `none recorded` (not `non_existent`). User decides.
+   - UI note: "Class assumes plants for planting pathway. Set manually to Non-existent for hitchhiking, natural spread or intentional introduction."
+8. Lovdata: search pest name + EPPO synonyms, host genera, pest-present countries.
+9. LLM receives labelled EPPO, SSB (with Class A, Class B, numbers), LAW blocks and produces the write-up.
+
+Stops are typed conditions (`stop_app("no_hosts")`) caught in the server and shown as one alert replacing all panels. Nothing downstream renders, no LLM call.
+
+## Steps
+1. **Scaffold**: renv, testthat, config.yml, `cache.R` (key = hash of query, value + timestamp, TTL per source, taxonomy permanent), `conditions.R`.
+2. **Lookup tables**: build and review `commodity_cn8.csv` (small, hand-checked, groups `conifer`/`broadleaf`, "other live plants" lines listed under both). Build `country_map.csv`. Thresholds file as above. I fill in `finnprio_writeup_template.txt`. UI shows "mapping reviewed [date]".
+3. **EPPO** (`api_eppo.R`): names2codes, taxon, hosts, taxonomy, distribution, categorization. First verify endpoints, rate limits and that taxonomy returns class/order against current docs. Tidy tibbles.
+4. **classify_hosts() + host_to_groups()**: as in Flow. Handle genus/family-level host codes via lineage. Fallback: small family-level lookup (Pinaceae, Cupressaceae, Taxaceae, etc.) if taxonomy lacks higher ranks.
+5. **Lovdata** (`law_index.R`): download current regulations XML (FOR-2000-12-01-1333 + annexes). Split into paragraphs/annex rows. Local keyword index. Return paragraph id, text, source URL, fetch date.
+6. **SSB** (`api_ssb.R`): confirm the table reports CN8 by country, and quantity in kg or pc, first. Chunk queries, cache per country x CN8. Handle CN8 revisions via valid_from/valid_to, show year range. Output per year: quantity, value, unit, origin, pest-present flag. Separate series per group.
+7. **Volume class** (`volume_class.R`): pure function `classify_volume(df, group, unit, stat, years, subset = c("all", "pest_present"))`, no API calls. Aggregates across countries before classifying. Mixed `both` CN8 lines counted once per group, never double-counted.
+8. **UI** (`mod_*.R`): one text input for EPPO code (optional names2codes helper) + Run. Slim header strip: pest name, EPPO code, commodity groups, number of present countries, fetch dates. Four panels:
+   - **Panel 1, SSB table summary:** per group and unit: Class A (official ENT3) and Class B (informational) as badges, each with number, statistic, year range, threshold version; latest year and max; flag if A and B or statistics disagree. Per top origin: quantity, value, pest-present marker. Downloadable as CSV.
+   - **Panel 2, SSB graph:** 10 years, ggplot2 + viridis, one facet per commodity group, top N origins, rest as "Other", pest-present origins marked. Downloadable as PNG.
+   - **Panel 3, Lovdata:** matching snippets with paragraph id, source URL, fetch date. Each snippet has its own copy button.
+   - **Panel 4, FinnPRIO write-up:** editable plain-text box, generated-by-LLM label, one "Copy" button (`rclipboard` or small JS), Regenerate button. No markdown, no tables, so it pastes cleanly into the FinnPRIO form.
+   - EPPO hosts and distribution go in the header strip, a collapsed "Derived inputs" expander (host table, present countries), and as input to the write-up.
+   - Footer: fetch dates, disclaimers (recorded trade not pest pressure; CN8 upper bound; pathway assumption).
+9. **LLM** (`llm_provider.R`): `ellmer`, config switch `claude` | `hf` (base_url `https://router.huggingface.co/v1`, model string in config). Prompt in `prompts.R` builds the write-up from `data/finnprio_writeup_template.txt`. Plain text only. ENT3 answer = Class A using the exact option names. Mentions Class B in one sentence if it differs. Uses supplied numbers as given (no recompute). Cites Lovdata paragraph ids inline as plain text, states "not found" when absent, ends with a short line listing data sources and fetch dates. Norwegian/English from config. Cache per input + model.
+10. **Tests** (mocked API responses):
+    - one per stop condition (invalid code, no hosts, no main/minor, no covered groups, no distribution, unit not kg/pc)
+    - host classification on three known pests (conifer-only, broadleaf-only, mixed)
+    - volume class: exactly 1,000,000 -> medium; exactly 10,000,000 -> medium; 999,999 -> small; 10,000,001 -> large
+    - Class A uses all origins; Class B uses pest-present origins only; A and B differ on a crafted case
+    - mixed-unit group classified separately per unit, kg and pc never summed
+    - missing threshold, no imports (`none recorded`), aggregation across countries, no double-counting of `both` lines
+    - class labels equal FinnPRIO option names
+    - country mapping, cache TTL, CN8 filtering by group
+    - law search on 3 known cases
+    - write-up contains no markdown characters
+    - every cited paragraph id exists in panel 3
+    - ENT3 class in the write-up equals Panel 1 Class A
+    - copy output equals the text box content
+11. **Eval**: 5-10 known cases across Claude and 2-3 HF models, outputs side by side for manual scoring (citation accuracy, hallucination, Norwegian quality).
+12. **Deploy**: second laptop, `shiny::runApp(host = "0.0.0.0", port = 3838)`, Cloudflare quick tunnel, sleep disabled. No auth unless sensitive data is added.
+
+## Order of work
+Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after each step. Stop and ask when a table, endpoint, threshold, mapping or form field is ambiguous. Do not guess.
+
+## v2 (later)
+- Add groups to `commodity_cn8.csv`: `potato_seed`, `potato_ware`, `tomato`, `cut_flowers`, true seeds (unit pc), etc. Keep seed and consumption separate (different regulation).
+- Add explicit rules in `host_to_groups()` (host code -> group).
+- Group-specific threshold rows only if FinnPRIO ever requires them.
+- Group-specific Lovdata search terms.
+- Optional: Eurostat behind `get_imports(cn8, countries, years)` for EU context.
+
+## Open questions for me
+- Which SSB table(s), and do they report kg for the plant CN8 lines?
+- Statistic for "annual" (default mean over 5 years)?
+- Which other FinnPRIO form fields should the write-up cover, in what order, and max length per field?
+- Write-up language: Norwegian or English?
+- Which HF models to compare?
+
+## Vignett
+
+- make a solid vignette readme page 
+
+# Github
+https://github.com/floedaniel/Pathway.git
+git@github.com:floedaniel/Pathway.git 
+
+# data 
+- ssb data from table 08801 cn codes
+ssb_url  <- "http://data.ssb.no/api/v0/no/table/08801"
+ 
+# lovdata
+
+finn https://lovdata.no/dokument/SF/forskrift/2000-12-01-1333 
+
+https://api.lovdata.no/om-api-tjenesten/
+
+https://api.lovdata.no/v1/publicData/get/gjeldende-sentrale-forskrifter.tar.bz2
+ 
+ 

@@ -182,6 +182,10 @@ Steps 1-5 first (no cost, testable), then 6-8, then 9-11, then 12. Commit after 
 
 # Q & A
 
+Did we not agree that the front page/start page should only take one input, i.e EPOO code or species name?
+then the app should fetch pathway from EPP GD and fetch correct data from ssb? 
+ege if one writes Agrilus anxius - app fatches https://gd.eppo.int/taxon/AGRLAX/pathwayshosts see below. and maps pathwayshosts  to finnprio patways, then fatches correct/relevant ssb data? 
+
 in eppo global database: In the database, the following categories are available (some cannot be searched for, as they are not attached to a specific plant species, e.g. agricultural machinery):
 • Agricultural machinery
 • All commodities
@@ -200,6 +204,7 @@ in eppo global database: In the database, the following categories are available
 • Squared wood
 • Stored products
 
+see: "C:\Users\dafl\Downloads\general_user-guide.pdf" (store in project for ref)
 
 Answers and decisions are in docs/decisions.md, findings in docs/findings.md.
 

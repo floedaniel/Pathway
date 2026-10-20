@@ -1,19 +1,22 @@
-# Write-up checks (Step 9), with a fake LLM: no network.
+# Write-up checks (Step 9): fixed layout filled by R, LLM only for regulation lines.
+# Fake LLM: no network.
 
-fake_result <- function(law_ids = c("Vedlegg 2, nr. 10", "§ 23"), pest_match = c(TRUE, FALSE),
-                        origin_rule = c(FALSE, FALSE)) {
+fake_result <- function(law_ids = c("Vedlegg 2, nr. 10", "Vedlegg 3, nr. 1.2", "§ 23"),
+                        pest_match = c(TRUE, FALSE, FALSE), origin_rule = c(FALSE, TRUE, FALSE)) {
   list(
     code = "IPSXCA", pest = "Ips calligraphus", groups = "conifer", present_countries = c("US", "MX"),
     classes = tibble::tibble(pathway = "wood", group = c("all_hosts", "conifer"), role = c("ent3", "info"),
                              stat = "median", years = "2016-2025", kg = 1.26e9, class = "large",
                              kg_pest_present = 4.3e5, share_pest_present = 3e-4),
-    law = tibble::tibble(id = law_ids, text = "x", pest_match = pest_match, origin_rule = origin_rule)
+    law = tibble::tibble(id = law_ids, text = paste0("1 | tekst ", seq_along(law_ids)),
+                         pest_match = pest_match, origin_rule = origin_rule)
   )
 }
-fake_present <- tibble::tibble(country = c("US", "MX"), name = c("USA (US)", "Mexico (MX)"), kg = c(4.3e5, 0),
-                               share = c(3e-4, 0), value_nok = 0, years_with_imports = c(10L, 0L),
-                               main_commodity = c("44071121 Trelast av furu", NA))
+fake_present <- tibble::tibble(country = c("US", "MX"), name = c("United States of America (US)", "Mexico (MX)"),
+                               kg = c(4.3e5, 0), share = c(3e-4, 0), value_nok = 0,
+                               years_with_imports = c(10L, 0L), main_commodity = c("44071121 Trelast av furu", NA))
 fake_inputs <- list(
+  lines_used = data.frame(cn8 = c("44071121_2017", "44152000_2001")),
   lines = tibble::tibble(cn8 = c("44071121_2017", "44152000_2001"), code = c("44071121", "44152000"),
                          description = c("Uimpregnert skurlast av furu", "Laste-, kassepaller"),
                          flags = c("", "upper_bound"), kg = c(1.2e9, 6e7), kg_pest_present = c(4.3e5, 0),
@@ -27,71 +30,68 @@ fixed_ask <- function(...) {
   i <- 0
   function(settings, system, prompt) { i <<- i + 1; replies[[min(i, length(replies))]] }
 }
+good_reply <- "Vedlegg 2, nr. 10: Non-European Scolytidae are listed.\nVedlegg 3, nr. 1.2: Conifer chips from named countries are banned."
 
-ok_text <- paste("ENT3: large. Wood imports of all host commodities were 1 260 000 000 kg per year (median 2016-2025),",
-                 "of which 430 000 kg per year from the USA, a small share. Regulated: Vedlegg 2, nr. 10.")
-
-test_that("prompt contains labelled blocks, the numbers and pest-present countries", {
-  p <- writeup_prompt(fake_result(), "wood", fake_inputs)
-  for (k in c("EPPO\n", "SSB (pathway: Wood, source SSB table 08801)", "LINES", "PRESENT",
-              "LAW (units naming the pest)", "ORIGIN RULES")) {
-    expect_match(p, k, fixed = TRUE)
-  }
-  expect_match(p, "ENT3 class: large", fixed = TRUE)
-  expect_match(p, "1 260 000 000 kg per year (median 2016-2025)", fixed = TRUE)
-  expect_match(p, "USA (US): 430 000 kg per year; by CN8 line, total over 2016-2025: 44071121 4 300 000 kg in 10 of 10 years", fixed = TRUE)
-  expect_match(p, "44152000 Laste-, kassepaller: 60 000 000 kg per year (5 % of total), mixed line", fixed = TRUE)
-  expect_match(p, "No recorded imports from: Mexico (MX)", fixed = TRUE)
-  expect_match(p, "Vedlegg 2, nr. 10:", fixed = TRUE)
-})
-
-test_that("LAW block says NOT FOUND when no unit names the pest; origin rules are listed", {
-  r <- fake_result(law_ids = c("Vedlegg 3, nr. 11", "§ 23"), pest_match = c(FALSE, FALSE), origin_rule = c(TRUE, FALSE))
-  p <- writeup_prompt(r, "wood", fake_inputs)
-  expect_match(p, "NOT FOUND", fixed = TRUE)
-  expect_match(p, "ORIGIN RULES (units naming a host genus and a pest-present country)\nVedlegg 3, nr. 11:", fixed = TRUE)
-})
-
-test_that("a valid reply is accepted and labelled with the model", {
+test_that("text follows the fixed layout with R's numbers, codes and class", {
   s <- test_settings()
-  w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask(ok_text), inputs = fake_inputs)
-  expect_equal(w$text, ok_text)
+  w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask(good_reply), inputs = fake_inputs)
+  lines <- strsplit(w$text, "\n")[[1]]
+  expect_equal(lines[1], "ENT3: Large")
+  expect_match(w$text, "Annual import into Norway of wood (CN 44): 1260.0 million kg (median 2016-2025).", fixed = TRUE)
+  expect_true("Largest CN8 lines (kg per year, share of total):" %in% lines)
+  expect_true("44071121: 1200.0 million kg (95%)" %in% lines)
+  expect_true("44152000: 60.0 million kg (5%, mixed line)" %in% lines)
+  expect_true("Imports from countries where the pest is present (information only, not ENT3):" %in% lines)
+  expect_true("United States of America: 430 000 kg per year (median 2016-2025); CN8 lines, total 2016-2025: 44071121 4.3 million kg" %in% lines)
+  expect_true("Mexico: no recorded imports" %in% lines)
+  expect_true("Regulation:" %in% lines)
+  expect_true("Vedlegg 3, nr. 1.2: Conifer chips from named countries are banned." %in% lines)
   expect_equal(w$source, paste0(s$llm$provider, ":", s$llm$model))
 })
 
+test_that("ENT3 class in the write-up equals Panel 1 Class A", {
+  r <- fake_result()
+  r$classes$class <- "medium"
+  txt <- writeup_text(r, "wood", fake_inputs, character())
+  expect_equal(strsplit(txt, "\n")[[1]][1], "ENT3: Medium")
+})
+
 test_that("write-up contains no markdown characters", {
-  bad <- "**ENT3: large.** 1 260 000 000 kg (median 2016-2025)."
-  expect_true("contains markdown characters" %in% validate_writeup(bad, fake_result(), "wood", test_settings()))
+  txt <- writeup_text(fake_result(), "wood", fake_inputs, regulation_fallback(regulation_units(fake_result())))
+  expect_false(grepl(markdown_chars, txt, perl = TRUE))
 })
 
-test_that("every cited paragraph id exists in Panel 3", {
-  s <- test_settings()
-  txt <- "ENT3: large. 1 260 000 000 kg/yr (median 2016-2025). Regulated: Vedlegg 4A, nr. 99."
-  expect_match(paste(validate_writeup(txt, fake_result(), "wood", s), collapse = " "), "not in Panel 3")
-  ok <- "ENT3: large. 1 260 000 000 kg/yr (median 2016-2025). See § 23."
-  expect_length(validate_writeup(ok, fake_result(), "wood", s), 0)
+test_that("regulation lines must start with an id shown in Panel 3", {
+  u <- regulation_units(fake_result())
+  expect_length(validate_regulation(strsplit(good_reply, "\n")[[1]], u), 0)
+  expect_match(validate_regulation("Vedlegg 9, nr. 99: something.", u), "not given: Vedlegg 9, nr. 99")
+  expect_match(paste(validate_regulation("**Vedlegg 2, nr. 10**: x", u), collapse = " "), "markdown")
 })
 
-test_that("ENT3 class in the write-up equals Panel 1 Class A; 'a small share' elsewhere is fine", {
-  s <- test_settings()
-  expect_true(any(grepl("does not state", validate_writeup("Imports are 5 kg.", fake_result(), "wood", s))))
-  expect_true(any(grepl("different ENT3 class", validate_writeup("ENT3 is medium. 5 kg.", fake_result(), "wood", s))))
-  expect_length(validate_writeup(ok_text, fake_result(), "wood", s), 0)
+test_that("regulation section covers pest units then origin rules, not host-only units", {
+  u <- regulation_units(fake_result())
+  expect_equal(u$id, c("Vedlegg 2, nr. 10", "Vedlegg 3, nr. 1.2"))
 })
 
-test_that("a rejected reply is retried once, then the deterministic draft is used", {
+test_that("a rejected reply is retried once, then the Lovdata text is used", {
   s <- test_settings()
   w <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask("# bad", "# still bad"), inputs = fake_inputs)
-  expect_equal(w$source, "draft")
-  expect_equal(w$text, writeup_draft(fake_result(), "wood", s, fake_inputs))
-  w2 <- generate_writeup(fake_result(), "wood", s, ask = fixed_ask("# bad", ok_text), nonce = 1, inputs = fake_inputs)
-  expect_false(w2$source == "draft")
+  expect_equal(w$source, "fallback")
+  expect_match(w$text, "Vedlegg 2, nr. 10: tekst 1", fixed = TRUE)
 })
 
-test_that("replies are cached per prompt and model; Regenerate (nonce) bypasses", {
+test_that("no units: text says not found and no LLM call is made", {
+  s <- test_settings()
+  r <- fake_result(pest_match = c(FALSE, FALSE, FALSE), origin_rule = c(FALSE, FALSE, FALSE))
+  w <- generate_writeup(r, "wood", s, ask = function(...) stop("no call expected"), inputs = fake_inputs)
+  expect_equal(w$source, "template")
+  expect_match(w$text, "Regulation:\nNot found in FOR-2000-12-01-1333.", fixed = TRUE)
+})
+
+test_that("regulation lines are cached per units and model; Regenerate (nonce) bypasses", {
   s <- test_settings()
   n <- 0
-  ask <- function(...) { n <<- n + 1; ok_text }
+  ask <- function(...) { n <<- n + 1; good_reply }
   generate_writeup(fake_result(), "wood", s, ask = ask, inputs = fake_inputs)
   generate_writeup(fake_result(), "wood", s, ask = ask, inputs = fake_inputs)
   expect_equal(n, 1)
@@ -99,23 +99,13 @@ test_that("replies are cached per prompt and model; Regenerate (nonce) bypasses"
   expect_equal(n, 2)
 })
 
+test_that("mass formatting: millions with one decimal, smaller numbers in kg", {
+  expect_equal(fmt_mass(19119489), "19.1 million kg")
+  expect_equal(fmt_mass(99), "99 kg")
+  expect_equal(fmt_mass(47234), "47 234 kg")
+})
+
 test_that("copy button targets the text box, so copied text equals the box content", {
   b <- copy_button("writeup-text_wood")
   expect_match(as.character(b), 'data-target="writeup-text_wood"', fixed = TRUE)
-})
-
-test_that("cited CN8 codes must belong to the pathway", {
-  s <- test_settings()
-  txt <- "Wood: ENT3 is large. Main line 44071121 and 06029021."
-  expect_match(paste(validate_writeup(txt, fake_result(), "wood", s, codes = fake_inputs$lines$code), collapse = " "),
-               "CN8 codes not in this pathway: 06029021")
-  expect_length(validate_writeup("Wood: ENT3 is large, mainly 44071121.", fake_result(), "wood", s,
-                                 codes = fake_inputs$lines$code), 0)
-})
-
-test_that("the draft names the pathway, CN8 codes and pest-present countries", {
-  d <- writeup_draft(fake_result(), "wood", test_settings(), fake_inputs)
-  expect_match(d, "^Wood: ENT3 is large")
-  expect_match(d, "44071121", fixed = TRUE)
-  expect_match(d, "USA (US) 430 000 kg", fixed = TRUE)
 })

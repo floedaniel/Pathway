@@ -40,5 +40,5 @@ test_that("manual pathways only: no SSB call, no classes, empty draft", {
   r <- run_assessment("IPSXCA", s, pathways = "seeds", cn8_table = cn8_table, law_index_fn = law_fixture_idx)
   expect_null(r$imports)
   expect_null(r$classes)
-  expect_equal(writeup_draft(r, "seeds", s), "")
+  expect_equal(generate_writeup(r, "seeds", s)$text, "")
 })

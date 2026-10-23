@@ -18,10 +18,11 @@ read_commodity_map <- function(file = "data/eppo_commodity_map.csv") {
 # Host selection for one computed pathway. hosts: classified hosts (classify_hosts()).
 # categories: EPPO categories (NULL = host-plant fallback, no category filter).
 pathway_info <- function(hosts, categories = NULL, monocot = NULL) {
+  use <- usable_hosts(hosts)
   list(
-    groups = run_groups(hosts),
-    monocot = monocot %||% any(hosts$monocot),
-    host_genera = host_genera_by_group(hosts),
+    groups = run_groups(use),
+    monocot = monocot %||% any(use$monocot),
+    host_genera = host_genera_by_group(use),
     categories = categories,
     hosts = hosts
   )

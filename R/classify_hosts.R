@@ -22,10 +22,13 @@ lineage_rank <- function(tax, type) {
 # EPPO's non-taxonomic commodity groups in host-commodity lists (lineage
 # "Commodity groups" > group): "plants" (2PLAN) and "woody plants" (2WOOP) cover
 # conifers too; the herbaceous / vegetable / fruit groups are non-conifer. Unknown
-# groups are treated as all plants (upper bound). No genus filter for any group.
+# groups are treated as all plants (upper bound). No genus filter for any group;
+# a narrow group listed next to named hosts is left out of the filter (usable_hosts()).
 commodity_group_class <- c("plants" = "all_plants", "woody plants" = "all_plants",
                            "herbaceous plants" = "non_conifer", "herbaceous ornamental plants" = "non_conifer",
-                           "vegetable plants" = "non_conifer", "fruit plants" = "non_conifer")
+                           "vegetable plants" = "non_conifer", "fruit plants" = "non_conifer",
+                           "fruit trees" = "non_conifer")
+broad_commodity_groups <- c("plants", "woody plants")
 
 classify_host <- function(tax) {
   group <- if (any(tax$prefname == "Commodity groups")) tolower(utils::tail(tax$prefname, 1)) else NA
@@ -47,7 +50,28 @@ classify_host <- function(tax) {
                  host_class = host_class,
                  monocot = host_class == "non_conifer" && any(tax$prefname %in% monocot_taxa),
                  taxa = paste(taxa, collapse = ";"),
-                 rank = if (nrow(tax) > 0 && is.na(group)) utils::tail(tax$type, 1) else NA_character_)
+                 rank = if (nrow(tax) > 0 && is.na(group)) utils::tail(tax$type, 1) else NA_character_,
+                 commodity_group = group)
+}
+
+# Hosts that select CN8 lines. A narrow EPPO group ("fruit trees", "vegetable
+# plants", unknown groups) says little next to named hosts, and as a host it would
+# switch off the host filter for every line (tester's report, ANSTFR: bananas and
+# avocados 70 % of food and fodder). So when a pathway also names taxa, the narrow
+# groups are left out; alone they still mean "no filter" (upper bound). "plants"
+# and "woody plants" always count.
+usable_hosts <- function(hosts) {
+  if (!"commodity_group" %in% names(hosts)) return(hosts)
+  grp <- hosts$commodity_group
+  narrow <- !is.na(grp) & !grp %in% broad_commodity_groups
+  if (any(narrow) && any(is.na(grp) & hosts$host_class != "not_plant")) hosts[!narrow, ] else hosts
+}
+
+# Narrow groups usable_hosts() leaves out (shown as a note).
+ignored_groups <- function(hosts) {
+  if (is.null(hosts) || !"commodity_group" %in% names(hosts)) return(character())
+  u <- usable_hosts(hosts)
+  setdiff(hosts$prefname, u$prefname)
 }
 
 # hosts: tibble from eppo_selected_hosts(). Returns hosts with lineage and host_class.

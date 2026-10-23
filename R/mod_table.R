@@ -147,6 +147,9 @@ pathway_notes <- function(pathway, r) {
                                            " for this pest (no traded commodity with a CN line): CN8 lines are chosen from its host plants (Major host, Host).")
               else "EPPO lists no host commodities for this pest: CN8 lines are chosen from its host plants (Major host, Host).")
   }
+  ignored <- ignored_groups(info$hosts)
+  if (length(ignored)) n <- c(n, paste0("EPPO also lists the group '", paste(ignored, collapse = "', '"),
+                                        "'. Codes are chosen from the named hosts only; other hosts in the group are not counted, so the amount may be too low."))
   if (pathway == "plants_for_planting") {
     if ("conifer" %in% info$groups) n <- c(n, "Conifer plants for planting only appear in catch-all lines. Class is a loose upper bound.")
     if (from_eppo) {

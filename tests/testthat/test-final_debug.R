@@ -21,6 +21,33 @@ test_that("generic non-conifer groups are not genus-filtered", {
   expect_null(host_genera_by_group(ch)$non_conifer)
 })
 
+test_that("'fruit trees' (2FRUT) is a non-conifer group", {
+  expect_equal(classify_host(lineage("Commodity groups", "fruit trees"))$host_class, "non_conifer")
+})
+
+# Tester's report (ANSTFR): EPPO lists "fruit trees" next to Citrus, Malus, Mangifera
+# indica, Prunus and Psidium guajava. The group switched off the host filter, so
+# bananas and avocados made up 70 % of food and fodder.
+test_that("a narrow group next to named hosts does not switch off the host filter", {
+  grp <- function(code, name, cls) dplyr::bind_cols(tibble::tibble(eppocode = code, prefname = name, class_label = "x"),
+                                                    classify_host(lineage("Commodity groups", name)))
+  taxon <- function(code, family, genus, species) tibble::tibble(eppocode = code, prefname = species, class_label = "x",
+    family = family, genus = genus, host_class = "non_conifer", monocot = FALSE,
+    taxa = paste(family, genus, species, sep = ";"), rank = "Species", commodity_group = NA_character_)
+  mango <- taxon("MNGIN", "Anacardiaceae", "Mangifera", "Mangifera indica")
+  ch <- dplyr::bind_rows(grp("2FRUT", "fruit trees"), mango)
+  expect_equal(run_groups(usable_hosts(ch)), "non_conifer")
+  info <- pathway_info(ch, categories = "fruits or vegetables")
+  x <- pathway_lines(read_commodity_cn8(file.path(root, "data", "commodity_cn8.csv")), "food_fodder", info)$cn8
+  expect_true(any(startsWith(x, "080450")))              # mangoes
+  expect_false(any(startsWith(x, "0803")))               # no bananas
+  expect_false(any(startsWith(x, "080440")))             # no avocados
+  expect_equal(nrow(info$hosts), 2)                      # the group is still shown
+  # 'plants' (2PLAN) keeps meaning all plants, also next to named hosts
+  all <- pathway_info(dplyr::bind_rows(grp("2PLAN", "plants"), mango))
+  expect_null(all$host_genera$non_conifer)
+})
+
 test_that("an EPPO list without any pathway category (soil only) falls back to host plants", {
   local_eppo_mock()
   s <- test_settings()

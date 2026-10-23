@@ -215,13 +215,19 @@ origins_text <- function(r) {
   else paste0("the ", length(o), " countries where the pest is present")
 }
 
+# Codes that name host taxa and nothing else: residual codes ("other Allium") and
+# family-level codes cover other species too. "Host-specific codes only" in Panel 1.
+host_specific <- function(genus, excludes = "") {
+  !is.na(genus) & nzchar(genus %||% "") & (is.na(excludes) | !nzchar(excludes %||% "")) &
+    !grepl("aceae(;|$)", genus %||% "")
+}
+
 # Does a customs code cover only the host? Yes when the code names a host genus
 # (column `genus`, e.g. sawn birch); otherwise it also covers other species
 # (pallets, broadleaved firewood, all trees and shrubs ...). Bark status is added.
 host_only_text <- function(genus, flags, excludes = "") {
   g <- !is.na(genus) & nzchar(genus %||% "")
-  # residual codes ("other Allium") and family-level codes cover other species too
-  mixed <- (!is.na(excludes) & nzchar(excludes %||% "")) | grepl("aceae(;|$)", genus %||% "")
+  mixed <- g & !host_specific(genus, excludes)
   short <- vapply(strsplit(as.character(ifelse(g, genus, "")), ";"), function(t)
     if (length(t) > 3) paste0(paste(t[1:3], collapse = ", "), " ...") else paste(t, collapse = ", "), "")
   star <- !is.na(excludes) & excludes %in% "*"
@@ -239,13 +245,13 @@ host_only_text <- function(genus, flags, excludes = "") {
 #    of the 10-year total, so they add up to 100 %.
 # 3. Where the host is named in the import statistics (own card).
 
-simple_table <- function(header, rows, right = integer(), foot = NULL) {
+simple_table <- function(header, rows, right = integer(), foot = NULL, row_class = NULL) {
   cell <- function(tag, x, j) tag(class = if (j %in% right) "text-end", x)
   th <- lapply(seq_along(header), function(j) cell(shiny::tags$th, header[j], j))
   shiny::tags$table(class = "table table-sm align-middle mb-1",
     shiny::tags$thead(shiny::tags$tr(th)),
-    shiny::tags$tbody(lapply(rows, function(cells) shiny::tags$tr(lapply(seq_along(cells), function(j)
-      cell(shiny::tags$td, cells[[j]], j))))),
+    shiny::tags$tbody(lapply(seq_along(rows), function(i) shiny::tags$tr(class = row_class[i],
+      lapply(seq_along(rows[[i]]), function(j) cell(shiny::tags$td, rows[[i]][[j]], j))))),
     if (!is.null(foot)) shiny::tags$tfoot(shiny::tags$tr(class = "fw-semibold table-light",
       lapply(seq_along(foot), function(j) cell(shiny::tags$td, foot[[j]], j)))))
 }
@@ -265,13 +271,18 @@ based_on <- function(p, r) {
 }
 
 # All numbers for one computed pathway: the ENT3 row, per-country and per-code
-# tables over the statistic years, and their totals.
+# tables over the statistic years, and their totals. Codes the assessor excluded
+# stay in the per-code table (kept = FALSE, no share) but not in any total.
 pathway_tables <- function(p, r, cn8_table, settings) {
   stat_years <- utils::tail(r$years, settings$volume_n)
+  info_all <- pinfo(r, p)
+  info_all$excluded <- NULL
+  all_lines <- pathway_lines(cn8_table, p, info_all)
   lines <- pathway_lines(cn8_table, p, pinfo(r, p))
-  x <- r$imports[r$imports$cn8 %in% lines$cn8 & r$imports$year %in% stat_years, ]
+  x_all <- r$imports[r$imports$cn8 %in% all_lines$cn8 & r$imports$year %in% stat_years, ]
+  x <- x_all[x_all$cn8 %in% lines$cn8, ]
   total_kg <- sum(x$kg, na.rm = TRUE)
-  per <- function(by) {
+  per <- function(by, x) {
     if (nrow(x) == 0) return(tibble::tibble(key = character(), kg = numeric(), kg_total = numeric(),
                                             nok_total = numeric(), years = integer()))
     y <- dplyr::summarise(dplyr::group_by(x, key = .data[[by]], year), q = sum(kg, na.rm = TRUE),
@@ -282,25 +293,26 @@ pathway_tables <- function(p, r, cn8_table, settings) {
     out[out$kg_total > 0, ]
   }
   share <- function(v) if (total_kg > 0) v / total_kg else rep(NA_real_, length(v))
-  country <- per("country")
+  country <- per("country", x)
   country <- country[order(-country$kg_total), ]
   country$share <- share(country$kg_total)
   main <- main_line_by_country(r$imports, lines, stat_years)
   country$main_code <- cn8_code(unname(main[country$key]))
   country$name <- country_name(country$key, r$country_names)
-  code <- per("cn8")
-  code <- code[order(-code$kg_total), ]
-  code$share <- share(code$kg_total)
-  m <- match(code$key, lines$cn8)
-  code$label <- cn8_short(lines)[m]
-  code$text <- cn8_text(lines)[m]
-  code$host_only <- host_only_text(lines$genus[m] %||% rep(NA, length(m)), lines$flags[m],
-                                   lines$excludes_genera[m] %||% rep("", length(m)))
+  code <- per("cn8", x_all)
+  code$kept <- code$key %in% lines$cn8
+  code <- code[order(!code$kept, -code$kg_total), ]
+  code$share <- ifelse(code$kept, share(code$kg_total), NA_real_)
+  m <- match(code$key, all_lines$cn8)
+  code$label <- cn8_short(all_lines)[m]
+  code$text <- cn8_text(all_lines)[m]
+  code$host_only <- host_only_text(all_lines$genus[m] %||% rep(NA, length(m)), all_lines$flags[m],
+                                   all_lines$excludes_genera[m] %||% rep("", length(m)))
   origins <- origin_countries(r)
   years_any <- sum(annual_totals(r$imports, lines, stat_years)$quantity > 0)
   list(ent3 = r$classes[r$classes$pathway == p & r$classes$role == "ent3", ],
        groups = r$classes[r$classes$pathway == p & r$classes$role == "info", ],
-       stat_years = stat_years, lines = lines, country = country, code = code,
+       stat_years = stat_years, lines = lines, all_lines = all_lines, country = country, code = code,
        no_imports = sort(country_name(setdiff(origins, country$key), r$country_names)),
        codes_without = sort(cn8_code(setdiff(lines$cn8, code$key))),
        total_kg = total_kg, total_nok = sum(x$value_nok, na.rm = TRUE), years_any = years_any,
@@ -312,7 +324,7 @@ ent3_text <- function(t) {
 }
 
 # Summary: one row per pathway (computed first, then manual ones).
-summary_ui <- function(r, tabs, manual) {
+summary_ui <- function(r, tabs, manual, hidden = character()) {
   yrs <- if (length(tabs)) tabs[[1]]$stat_years else r$years
   rows <- lapply(names(tabs), function(p) {
     t <- tabs[[p]]
@@ -327,6 +339,9 @@ summary_ui <- function(r, tabs, manual) {
          if (nrow(listed)) paste0("EPPO host commodities: ", paste(unique(listed$category), collapse = ", ")) else "-",
          "-", shiny::span(class = "badge text-bg-secondary", "assess manually"), "-", "-")
   }))
+  rows <- c(rows, lapply(hidden, function(p) list(shiny::tags$b(pathway_label(p)), "-", "-",
+    shiny::span(class = "badge text-bg-light border", "left out by the assessor"), "-", "-")))
+  n_ex <- sum(lengths(r$excluded))
   shiny::tagList(
     shiny::h4("Summary"),
     shiny::p(class = "mb-2", paste0("Imports into Norway from ", origins_text(r), ", ",
@@ -334,12 +349,26 @@ summary_ui <- function(r, tabs, manual) {
                                     if ("NO" %in% r$present_countries) " The pest is also present in Norway.")),
     simple_table(c("Pathway", "Based on", paste0("kg per year (median ", min(yrs), "-", max(yrs), ")"), "ENT3 class",
                    "Largest source country", "Largest customs code"), rows, right = 3),
-    shiny::p(class = "small text-muted", "One ENT3 answer per pathway. The pathways are assessed separately, so their amounts are not added up.")
+    shiny::p(class = "small text-muted", "One ENT3 answer per pathway. The pathways are assessed separately, so their amounts are not added up.",
+             if (n_ex > 0) paste0(" The assessor excluded ", n_ex, " customs code", if (n_ex > 1) "s",
+                                  "; the amounts and classes above are without them."))
   )
 }
 
+# Checkbox, switch or button that reports a selection change (JS in app.R).
+sel_control <- function(input_id, action, pathway, code = "", checked = TRUE, label = NULL) {
+  if (is.null(label)) {
+    shiny::tags$input(type = "checkbox", class = "form-check-input pathwise-sel", checked = if (checked) NA,
+                      `data-input` = input_id, `data-action` = action, `data-pathway` = pathway, `data-code` = code,
+                      title = if (action == "code") "Count this code" else "Include this pathway")
+  } else {
+    shiny::tags$button(type = "button", class = "btn btn-sm btn-outline-secondary pathwise-sel",
+                       `data-input` = input_id, `data-action` = action, `data-pathway` = pathway, label)
+  }
+}
+
 # One card per computed pathway; both tables have the same number columns.
-pathway_card_ui <- function(i, p, t, r) {
+pathway_card_ui <- function(i, p, t, r, input_id = "") {
   yrs <- paste0(min(t$stat_years), "-", max(t$stat_years))
   n <- length(t$stat_years)
   num_head <- c("kg per year (median)", paste0("kg in total ", yrs), "Share of total", paste0("NOK in total ", yrs),
@@ -359,7 +388,8 @@ pathway_card_ui <- function(i, p, t, r) {
   bslib::card(class = "mt-3",
     bslib::card_header(class = "d-flex flex-wrap justify-content-between align-items-center",
       shiny::tags$h5(class = "mb-0", paste0(i, ". ", pathway_label(p))),
-      shiny::span("ENT3: ", class_badge(t$ent3$class), " ", ent3_text(t), " (median ", yrs, ")")),
+      shiny::span("ENT3: ", class_badge(t$ent3$class), " ", ent3_text(t), " (median ", yrs, ")"),
+      include_switch(input_id, p, TRUE)),
     bslib::card_body(
       shiny::p(class = "small text-muted mb-2", paste0("Based on ", based_on(p, r), ". Imports from ", origins_text(r), ".")),
       groups,
@@ -374,12 +404,18 @@ pathway_card_ui <- function(i, p, t, r) {
       shiny::h6(class = "mt-3", "By customs code"),
       shiny::p(class = "small text-muted mb-1", paste0(
         "The customs (CN8) codes whose imports make up the ENT3 amount. 'No, also other species' means the code covers ",
-        "more than the host (e.g. pallets of any wood), so the amount is an upper bound. Hover over a name for the full tariff text.")),
-      if (nrow(t$code)) simple_table(c("Customs code", "What the code covers", "Only the host?", num_head),
-        lapply(seq_len(nrow(t$code)), function(k) c(list(shiny::tags$code(cn8_code(t$code$key[k])),
+        "more than the host (e.g. pallets of any wood), so the amount is an upper bound. Hover over a name for the full tariff text. ",
+        "Untick a code to leave it out: every panel and the ENT3 class then use the remaining codes.")),
+      if (nrow(t$code)) shiny::div(class = "d-flex gap-1 mb-1",
+        sel_control(input_id, "all", p, label = "All codes"), sel_control(input_id, "none", p, label = "No codes"),
+        sel_control(input_id, "host", p, label = "Host-specific codes only")),
+      if (nrow(t$code)) simple_table(c("", "Customs code", "What the code covers", "Only the host?", num_head),
+        lapply(seq_len(nrow(t$code)), function(k) c(list(sel_control(input_id, "code", p, t$code$key[k], t$code$kept[k]),
+                                                         shiny::tags$code(cn8_code(t$code$key[k])),
                                                          shiny::span(title = t$code$text[k], t$code$label[k]),
                                                          t$code$host_only[k]), num_cells(t$code, k))),
-        right = 4:8, foot = c(list("Total", "", ""), num_total)) else shiny::p("No recorded imports."),
+        right = 5:9, foot = c(list("", "Total", "", ""), num_total),
+        row_class = ifelse(t$code$kept, "", "text-muted text-decoration-line-through")) else shiny::p("No recorded imports."),
       if (length(t$codes_without)) shiny::p(class = "small mb-1", shiny::tags$b("Also counted, no recorded imports: "),
                                             paste(t$codes_without, collapse = ", ")),
       if (nrow(t$code)) star,
@@ -387,6 +423,20 @@ pathway_card_ui <- function(i, p, t, r) {
                                     shiny::tags$ul(class = "mb-0", lapply(notes, shiny::tags$li)))
     )
   )
+}
+
+include_switch <- function(input_id, p, on) {
+  shiny::div(class = "form-check form-switch mb-0 small",
+    sel_control(input_id, "pathway", p, checked = on), shiny::tags$label(class = "form-check-label", "Include"))
+}
+
+# A pathway the assessor left out: header and switch only.
+hidden_card_ui <- function(i, p, input_id) {
+  bslib::card(class = "mt-3",
+    bslib::card_header(class = "d-flex flex-wrap justify-content-between align-items-center text-muted",
+      shiny::tags$h5(class = "mb-0", paste0(i, ". ", pathway_label(p))),
+      shiny::span("Left out by the assessor: not in the graph or the write-up."),
+      include_switch(input_id, p, FALSE)))
 }
 
 # All SSB 08801 codes whose name mentions a host genus (R/host_search.R).
@@ -408,13 +458,19 @@ host_search_ui <- function(r) {
   )
 }
 
-panel1_ui <- function(r, sel, cn8_table, settings) {
-  computed <- intersect(sel, names(r$pathway_info))
-  manual <- setdiff(sel, computed)  # EPPO category without CN lines (stored products, pollen)
+# r: the result with the assessor's selection applied (apply_selection()); sel: all
+# pathways of the run, also those left out; input_id: the selection input.
+panel1_ui <- function(r, sel, cn8_table, settings, input_id = "") {
+  all_computed <- intersect(sel, names(r$pathway_info))
+  computed <- setdiff(all_computed, r$hidden)
+  manual <- setdiff(sel, all_computed)  # EPPO category without CN lines (stored products, pollen)
   tabs <- stats::setNames(lapply(computed, pathway_tables, r = r, cn8_table = cn8_table, settings = settings), computed)
   shiny::tagList(
-    summary_ui(r, tabs, manual),
-    lapply(seq_along(computed), function(i) pathway_card_ui(i, computed[i], tabs[[i]], r)),
+    summary_ui(r, tabs, manual, intersect(all_computed, r$hidden)),
+    lapply(seq_along(all_computed), function(i) {
+      p <- all_computed[i]
+      if (p %in% computed) pathway_card_ui(i, p, tabs[[p]], r, input_id) else hidden_card_ui(i, p, input_id)
+    }),
     host_search_ui(r)
   )
 }
@@ -422,26 +478,54 @@ panel1_ui <- function(r, sel, cn8_table, settings) {
 mod_table_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
+    shiny::div(class = "d-flex justify-content-end",
+      shiny::actionButton(ns("reset"), "Reset selection (all codes and pathways)", class = "btn-sm btn-outline-secondary")),
     shiny::uiOutput(ns("summary")),
     shiny::p(class = "small text-muted mt-2", "All quantities in kg. 'none recorded' means no imports from these countries in the data; you decide."),
     shiny::downloadButton(ns("csv"), "Download CSV", class = "btn-sm")
   )
 }
 
-mod_table_server <- function(id, result, pathways, cn8_table, settings) {
+# New selection after one event from Panel 1 (sel_control()). s: list(run_id,
+# excluded, hidden); lines: all CN8 lines of the pathway (none excluded).
+update_selection <- function(s, e, lines) {
+  p <- e$pathway
+  ex <- s$excluded[[p]] %||% character()
+  s$excluded[[p]] <- switch(e$action,
+    code = if (isTRUE(e$on)) setdiff(ex, e$code) else union(ex, e$code),
+    all = character(),
+    none = lines$cn8,
+    host = lines$cn8[!host_specific(lines$genus %||% rep(NA, nrow(lines)), lines$excludes_genera %||% rep("", nrow(lines)))],
+    ex)
+  if (e$action == "pathway") s$hidden <- if (isTRUE(e$on)) setdiff(s$hidden, p) else union(s$hidden, p)
+  s
+}
+
+# result: the run; selected: the run with the selection applied; selection: the
+# shared reactiveVal; pathways: all pathways of the run.
+mod_table_server <- function(id, result, selected, selection, pathways, cn8_table, settings) {
   shiny::moduleServer(id, function(input, output, session) {
-    output$summary <- shiny::renderUI({
+    shiny::observeEvent(input$sel, {
       r <- result()
-      shiny::req(is.list(r), !inherits(r, "condition"))
+      s <- selection()
+      if (!identical(s$run_id, r$run_id)) s <- list(run_id = r$run_id, excluded = list(), hidden = character())
+      info <- pinfo(r, input$sel$pathway)
+      lines <- if (is.null(info)) cn8_table[0, ] else pathway_lines(cn8_table, input$sel$pathway, info)
+      selection(update_selection(s, input$sel, lines))
+    })
+    shiny::observeEvent(input$reset, selection(list(run_id = NULL, excluded = list(), hidden = character())))
+    output$summary <- shiny::renderUI({
       sel <- pathways()
       shiny::validate(shiny::need(length(sel) > 0, "No pathway for this pest."))
-      panel1_ui(r, sel, cn8_table, settings)
+      panel1_ui(selected(), sel, cn8_table, settings, session$ns("sel"))
     })
     output$csv <- shiny::downloadHandler(
       filename = function() paste0("pathwise_", result()$code, ".csv"),
       content = function(file) {
-        cl <- result()$classes
-        utils::write.csv(cl[cl$pathway %in% pathways(), ], file, row.names = FALSE)
+        r <- selected()
+        cl <- r$classes[r$classes$pathway %in% r$pathways, ]
+        cl$excluded_codes <- vapply(cl$pathway, function(p) paste(cn8_code(r$excluded[[p]]), collapse = ";"), "")
+        utils::write.csv(cl, file, row.names = FALSE)
       }
     )
   })

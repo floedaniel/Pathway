@@ -102,3 +102,12 @@ test_that("legend names each country with its largest CN8 codes in the pathway",
   expect_true("Netherlands (06029098, 06029010, 06021029)" %in% levels(d$origin))  # top 3 codes, largest first
   expect_true("Denmark (06029098)" %in% levels(d$origin))
 })
+
+test_that("graph can stack by customs code (largest code at the bottom, rest as 'Other codes')", {
+  imp <- tibble::tibble(cn8 = c("06029098_2016", "06029010_2011", "06021029_2001"), country = "NL", year = 2025L,
+                        kg = c(500, 300, 100), value_nok = 0)
+  d <- graph_data(imp, cn8_table, "plants_for_planting", list(groups = "conifer"), 2025L, top_n = 2, by = "code")
+  lv <- levels(d$origin)
+  expect_equal(lv[1], "Other codes")
+  expect_match(lv[length(lv)], "^06029098 ")
+})

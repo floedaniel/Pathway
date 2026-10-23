@@ -30,7 +30,7 @@ Working agreements (from the user):
 ## Status
 
 - **App:** single input, four panels, LLM write-up; all five FinnPRIO pathways computed when EPPO lists the commodity (decision 57). All 318 test pests run through pipeline, Panel 1, graph and write-up without R errors (sweep 2026-10-20 after decisions 55-57: plants for planting 298 pests, wood 156, other plant parts 75, food and fodder 56, seeds 23).
-- **Tests:** all offline tests pass (306 expectations) (`testthat::test_dir("tests/testthat")`).
+- **Tests:** all offline tests pass (323 expectations) (`testthat::test_dir("tests/testthat")`). `dev/check_selection.R` runs ANSTFR through the app's server headless (selection events, graph, write-up, reset).
 - **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `d59da8f` (2026-10-20, includes decisions 52-57). Redeploy after changes with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
@@ -72,8 +72,9 @@ Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant comm
     - Notes as a small list at the bottom of the card (bark subtotal included).
   - **Where the host is named in the import statistics** (own card): Customs code | Valid years | Name in SSB | Host | Matched word | Counted?.
   - Code: `panel1_ui()` -> `summary_ui()`, `pathway_tables()` (numbers), `pathway_card_ui()`, `host_search_ui()` in `R/mod_table.R`.
-- **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom. Only pest-present countries. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Caption explains the bars. (The all/pest-present switch was removed with decision 52.) PNG download. No "*" marker (removed on request).
-- **Panel 3, Lovdata:** snippets with id (e.g. "Vedlegg 2, nr. 10"), link, copy button.
+  - **Assessor's selection** (decision 59): a checkbox per customs code, buttons All / No codes / Host-specific codes only, an Include switch per pathway, Reset. Excluded codes stay in the table (struck through) but leave every total; the ENT3 amount and class are recomputed (`apply_selection()` in `R/pipeline.R`; excluded codes live in `pathway_info[[p]]$excluded`, so `pathway_lines()` drops them in all panels). The write-up gets "Excluded by the assessor: ...", the CSV an `excluded_codes` column. The selection belongs to one run (`run_id`); a new run starts with everything.
+- **Panel 2, SSB graph:** stacked bars per year, one facet per host group, top 6 origins + "Other countries", largest at the bottom; or stacked by customs code (top 6 + "Other codes"). Only pest-present countries and the codes kept in Panel 1. Legend = "Country (code1, code2, code3)", the country's largest CN8 lines in the pathway. Caption explains the bars. (The all/pest-present switch was removed with decision 52.) PNG and CSV download. No "*" marker (removed on request).
+- **Panel 3, Lovdata:** snippets with id (e.g. "Vedlegg 2, nr. 10"), link, copy button. Texts over 300 characters are collapsed (click to show all; Copy copies the full text).
 - **Panel 4, FinnPRIO write-up:** per computed pathway an editable text box, Copy, Regenerate, labelled with its source (model or fallback).
 - **Derived inputs** (collapsed): present countries, EPPO host-commodity table (category, host, EPPO code, FinnPRIO pathway, status), host plant table.
 - **Footer:** fetch dates only (EPPO, SSB with table update date, Lovdata, thresholds reviewed). The disclaimer sentence was removed on request.
@@ -84,7 +85,7 @@ Answers FinnPRIO **ENT3**, "How large a volume of the considered host plant comm
 - conifer: lineage contains Pinopsida, Pinales or Coniferales.
 - non_conifer: any other plant (kingdom Plantae), incl. herbaceous plants, cycads, Ginkgo, ferns. No woody test (the woody list was dropped).
 - monocot: EPPO category "Basal monocotyledons" or "Commelinids".
-- EPPO commodity groups used as hosts: 2PLAN plants and 2WOOP woody plants -> all plants (both groups, no genus filter); 2VEGP, 2FRUP, 2ORNH, 2HERP -> non_conifer. Unknown group -> all plants.
+- EPPO commodity groups used as hosts: 2PLAN plants and 2WOOP woody plants -> all plants (both groups, no genus filter); 2VEGP, 2FRUP, 2FRUT (fruit trees), 2ORNH, 2HERP -> non_conifer. Unknown group -> all plants. A narrow group (anything but 2PLAN/2WOOP) listed next to named hosts is left out of the code selection (`usable_hosts()`, decision 58; tester's report: ANSTFR counted bananas and avocados via 'fruit trees'); alone it still means no filter.
 - Each host also gets `taxa` (its EPPO name and lineage names from family down, e.g. "Solanaceae;Solanum;Solanum lycopersicum") and `rank` (its own EPPO rank) for matching CN8 lines (decision 57; user: "use the EPPO API for taxonomy").
 - Taxonomy cached permanently per host code. `eppo_taxonomy()` includes the taxon itself as the last row; varieties are typed "Species" (e.g. CIDSI Citrus x aurantium var. sinensis under genus Citrus).
 
@@ -282,6 +283,8 @@ Note: <pathway notes>
 12. Decision 53: plain-language headings and columns in Panel 1; "Only the host?" column replaces the flags column; genus-specific codes no longer called "mixed line".
 13. Decision 54: Panel 1 restructured: summary first, one card per pathway, identical tables with total rows.
 14. Decisions 55-57: answers to questions 1-14: mini model, no password (not on the free plan), library(config) removed; seed potatoes; food and fodder, other plant parts and seeds computed; host matching on EPPO taxonomy; crop-name table.
+15. Decision 58: tester's report (ANSTFR bananas and avocados): narrow EPPO groups next to named hosts no longer switch off the host filter.
+16. Decision 59: the assessor's selection of customs codes and pathways (review of the tester's improvement list); graph by customs code; Lovdata texts collapsed.
 
 Plan steps dropped by the user: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; replaced by Connect Cloud).
 

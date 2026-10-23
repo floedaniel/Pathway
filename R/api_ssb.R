@@ -173,7 +173,8 @@ as_hosts <- function(x) {
 # CN8 lines for a pathway from its host selection `info` (see pathway_info() in
 # R/pipeline.R); `group` restricts to one host group.
 pathway_lines <- function(cn8_table, pathway, info, group = NULL) {
-  cn8_lines(cn8_table, pathway, group %||% info$groups, isTRUE(info$monocot), info$host_genera, info$categories)
+  x <- cn8_lines(cn8_table, pathway, group %||% info$groups, isTRUE(info$monocot), info$host_genera, info$categories)
+  x[!x$cn8 %in% info$excluded, ]  # codes the assessor excluded (apply_selection())
 }
 
 # Hosts per group for cn8_lines(), each list(taxa, rank) from the EPPO taxonomy

@@ -45,7 +45,10 @@ mod_writeup_server <- function(id, result, pathways, settings) {
 
     output$boxes <- shiny::renderUI({
       w <- texts()
-      lapply(pathways(), function(p) {
+      hidden <- result()$hidden
+      left_out <- if (length(hidden)) shiny::p(class = "small text-muted", paste0(
+        "Left out by the assessor (Panel 1): ", paste(pathway_label(hidden), collapse = ", "), "."))
+      shiny::tagList(left_out, lapply(pathways(), function(p) {
         box_id <- session$ns(paste0("text_", p))
         head <- shiny::tags$label(class = "fw-semibold", `for` = box_id, pathway_label(p))
         if (is.null(pinfo(result(), p))) {
@@ -62,7 +65,7 @@ mod_writeup_server <- function(id, result, pathways, settings) {
           shiny::p(class = "small text-muted mb-1", writeup_label(x)),
           shiny::textAreaInput(box_id, NULL, value = x$text, width = "100%", rows = n_rows, resize = "vertical"),
           copy_button(box_id, "Copy"))
-      })
+      }))
     })
   })
 }

@@ -17,6 +17,18 @@ document.addEventListener('click', function (e) {
   navigator.clipboard.writeText(text).then(function () {
     var old = b.innerText; b.innerText = 'Copied'; setTimeout(function () { b.innerText = old; }, 1200);
   });
+});
+// Panel 1 selection: code checkboxes, pathway switches and preset buttons send
+// one event to the input named in data-input.
+function pathwiseSel(el) {
+  Shiny.setInputValue(el.dataset.input, {action: el.dataset.action, pathway: el.dataset.pathway,
+    code: el.dataset.code || '', on: el.tagName === 'INPUT' ? el.checked : true}, {priority: 'event'});
+}
+document.addEventListener('change', function (e) {
+  var c = e.target.closest('input.pathwise-sel'); if (c) pathwiseSel(c);
+});
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('button.pathwise-sel'); if (b) pathwiseSel(b);
 });"))
 
 ui <- bslib::page_fluid(
@@ -49,8 +61,10 @@ server <- function(input, output, session) {
     input_text <- inp$code()
     req(nzchar(input_text))
     withProgress(message = paste("Running", input_text), value = 0.3, {
-      tryCatch(run_assessment(input_text, settings, cn8_table = cn8_table),
-               pathwise_stop = function(e) e, pathwise_api_error = function(e) e)
+      r <- tryCatch(run_assessment(input_text, settings, cn8_table = cn8_table),
+                    pathwise_stop = function(e) e, pathwise_api_error = function(e) e)
+      if (!inherits(r, "condition")) r$run_id <- inp$run()
+      r
     })
   })
 
@@ -58,6 +72,19 @@ server <- function(input, output, session) {
     r <- result()
     if (is.list(r) && !inherits(r, "condition")) r$pathways else character()
   })
+
+  # The assessor's selection (decision 59), shared by all panels. It belongs to one
+  # run: a selection from an earlier run is ignored, so a new pest starts with all
+  # codes and pathways.
+  selection <- reactiveVal(list(run_id = NULL, excluded = list(), hidden = character()))
+  selected <- reactive({
+    r <- result()
+    req(is.list(r), !inherits(r, "condition"))
+    s <- selection()
+    if (!identical(s$run_id, r$run_id)) return(apply_selection(r, list(), character(), cn8_table, settings))
+    apply_selection(r, s$excluded, s$hidden, cn8_table, settings)
+  })
+  selected_pathways <- reactive(selected()$pathways)
 
   output$has_result <- reactive(is.list(result()) && !inherits(result(), "condition"))
   outputOptions(output, "has_result", suspendWhenHidden = FALSE)
@@ -117,10 +144,10 @@ server <- function(input, output, session) {
            ". Thresholds reviewed ", read_thresholds()$reviewed[1], ".")
   })
 
-  mod_table_server("table", result, shown_pathways, cn8_table, settings)
-  mod_graph_server("graph", result, shown_pathways, cn8_table)
+  mod_table_server("table", result, selected, selection, shown_pathways, cn8_table, settings)
+  mod_graph_server("graph", selected, selected_pathways, cn8_table)
   mod_law_server("law", result)
-  mod_writeup_server("writeup", result, shown_pathways, settings)
+  mod_writeup_server("writeup", selected, selected_pathways, settings)
 }
 
 shinyApp(ui, server)

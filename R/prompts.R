@@ -94,6 +94,16 @@ regulation_units <- function(r, max_each = 4) {
   rbind(in_order(utils::head(law[law$pest_match, ], max_each)), in_order(utils::head(law[rules, ], max_each)))
 }
 
+# Codes the assessor left out of a pathway (decision 59), as one line; character()
+# when none.
+excluded_text <- function(r, pathway, cn8_table = read_commodity_cn8()) {
+  ex <- r$excluded[[pathway]]
+  if (!length(ex)) return(character())
+  lab <- cn8_short(cn8_table[match(ex, cn8_table$cn8), ])
+  paste0("Excluded by the assessor: ", paste0(ifelse(is.na(lab), "", paste0(lab, " ")), "(", cn8_code(ex), ")",
+                                              collapse = "; "), ".")
+}
+
 # The full text for one pathway; `regulation` = character vector of lines.
 writeup_text <- function(r, pathway, inputs, regulation) {
   ent3 <- r$classes[r$classes$pathway == pathway & r$classes$role == "ent3", ]
@@ -114,7 +124,7 @@ writeup_text <- function(r, pathway, inputs, regulation) {
                                    " in these CN lines, not only host ", if (pathway == "plants_for_planting") "plants" else "commodities",
                                    ", so it is an upper bound.")))
   basis <- if (!is.null(r$pathway_info)) pathway_basis(pathway, r) else NULL
-  out <- c(out, if (!is.null(basis)) basis, "")
+  out <- c(out, if (!is.null(basis)) basis, excluded_text(r, pathway), "")
 
   # "commodity (CN8 code): amount", commodity = short customs-tariff wording
   label_of <- function(cn8) {

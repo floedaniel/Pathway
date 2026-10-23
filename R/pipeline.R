@@ -143,3 +143,21 @@ run_assessment <- function(input, settings, cn8_table = read_commodity_cn8(), th
 
 # Host selection of a computed pathway in a result.
 pinfo <- function(r, pathway) r$pathway_info[[pathway]]
+
+# The assessor's selection (decision 59). excluded: list(pathway = CN8 keys left
+# out); hidden: pathways left out. The excluded codes go into the pathway info, so
+# pathway_lines() drops them in every panel, and the pathway's ENT3 rows are
+# recomputed from the yearly totals of the kept codes (not by subtracting medians).
+apply_selection <- function(r, excluded, hidden, cn8_table, settings, thresholds = read_thresholds()) {
+  excluded <- Filter(length, excluded[intersect(names(excluded), names(r$pathway_info))])
+  r$hidden <- intersect(hidden, r$pathways)
+  r$pathways <- setdiff(r$pathways, hidden)
+  r$excluded <- excluded
+  for (p in names(excluded)) {
+    r$pathway_info[[p]]$excluded <- excluded[[p]]
+    rows <- classify_pathway(r$imports, cn8_table, p, r$pathway_info[[p]], settings, r$years, thresholds)
+    r$classes <- dplyr::bind_rows(lapply(unique(r$classes$pathway), function(q)
+      if (q == p) rows else r$classes[r$classes$pathway == q, ]))
+  }
+  r
+}

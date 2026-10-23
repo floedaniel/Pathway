@@ -31,7 +31,7 @@ Working agreements (from the user):
 
 - **App:** single input, four panels, LLM write-up; all five FinnPRIO pathways computed when EPPO lists the commodity (decision 57). All 318 test pests run through pipeline, Panel 1, graph and write-up without R errors (sweep 2026-10-20 after decisions 55-57: plants for planting 298 pests, wood 156, other plant parts 75, food and fodder 56, seeds 23).
 - **Tests:** all offline tests pass (335 expectations) (`testthat::test_dir("tests/testthat")`). `dev/check_selection.R` runs ANSTFR through the app's server headless (selection events, graph, write-up, reset). `dev/sweep_tables.R <old csv> <out csv>` compares every test pest's ENT3 between two CN8 tables.
-- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `d59da8f` (2026-10-20, includes decisions 52-57). Redeploy after changes with `Rscript dev/deploy.R`.
+- **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `9dbbf6b` (2026-10-23, includes decisions 52-62; live page checked, HTTP 200 with the new selection controls). Redeploy after changes with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
   - Dashboard: https://connect.posit.cloud/danielflow/content/01a158ac-9fd3-b5d5-8776-1d40f1995348

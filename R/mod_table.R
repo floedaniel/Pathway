@@ -351,7 +351,10 @@ summary_ui <- function(r, tabs, manual, hidden = character()) {
                    "Largest source country", "Largest customs code"), rows, right = 3),
     shiny::p(class = "small text-muted", "One ENT3 answer per pathway. The pathways are assessed separately, so their amounts are not added up.",
              if (n_ex > 0) paste0(" The assessor excluded ", n_ex, " customs code", if (n_ex > 1) "s",
-                                  "; the amounts and classes above are without them."))
+                                  "; the amounts and classes above are without them."),
+             if (identical(r$pathway_source, "eppo_commodities") && "packaging material" %in% r$other_categories)
+               paste0(" EPPO also lists packaging material. It is not counted: CN 4415 covers wooden pallets and crates ",
+                      "traded as goods, and EPPO lists no wood commodity for this pest; assess packaging manually."))
   )
 }
 

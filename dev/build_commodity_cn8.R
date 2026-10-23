@@ -103,7 +103,8 @@ row_of <- vapply(code, function(cd) {
   if (length(hit)) hit[1] else NA_integer_
 }, integer(1))
 fresh <- has("frisk|fersk|kjølt")
-take <- !is.na(row_of) & host_taxa$pathway[row_of] != "exclude" &
+in_0602 <- startsWith(code, "0602")  # already in `plants`; their taxa are set below
+take <- !is.na(row_of) & host_taxa$pathway[row_of] != "exclude" & !in_0602 &
   (host_taxa$pathway[row_of] != "food_fodder" | fresh)
 more <- d[take, ]
 ht <- host_taxa[row_of[take], ]
@@ -115,9 +116,29 @@ more$notes <- ""
 more$reviewed <- ""
 more_taxa <- ht$taxa
 more_excl <- ht$excludes
-# "@vegetables" = every taxon named on the fresh-vegetable lines (chapter 07)
-veg <- unique(unlist(strsplit(ht$taxa[startsWith(more$cn8, "07") & ht$pathway == "food_fodder"], ";")))
-more_taxa[more_taxa == "@vegetables"] <- paste(sort(veg[nzchar(veg)]), collapse = ";")
+# Taxon sets: "@vegetables" = every taxon named on the fresh-vegetable lines
+# (chapter 07), "@fruits" = on the fruit and nut lines (chapter 08),
+# "@fruit_trees" = @fruits without herbaceous fruit (strawberry, pineapple, banana,
+# melons), for 0602 20 trees and shrubs bearing edible fruit or nuts. In an
+# exclusion list families are left out (Brassicaceae would also exclude ornamentals).
+taxa_on <- function(prefix) {
+  x <- unique(unlist(strsplit(ht$taxa[startsWith(more$cn8, prefix) & ht$pathway == "food_fodder"], ";")))
+  sort(x[nzchar(x) & !startsWith(x, "@")])
+}
+taxon_sets <- list("@vegetables" = taxa_on("07"), "@fruits" = taxa_on("08"))
+taxon_sets[["@fruit_trees"]] <- setdiff(taxon_sets[["@fruits"]],
+  c("Fragaria", "Fragaria x ananassa", "Ananas comosus", "Musa", "Cucumis melo", "Citrullus lanatus"))
+# "@vegetable_crops": @vegetables without trees (allspice, Pimenta), for the 0602
+# catch-alls that do not count for vegetable crops
+taxon_sets[["@vegetable_crops"]] <- taxon_sets[["@vegetables"]][!startsWith(taxon_sets[["@vegetables"]], "Pimenta")]
+expand_taxa <- function(x, families = TRUE) vapply(x, function(s) {
+  parts <- strsplit(s, ";")[[1]]
+  out <- unique(unlist(lapply(parts, function(p) if (p %in% names(taxon_sets)) taxon_sets[[p]] else p)))
+  if (!families) out <- out[!grepl("aceae$", out)]
+  paste(out, collapse = ";")
+}, "", USE.NAMES = FALSE)
+more_taxa <- expand_taxa(more_taxa)
+more_excl <- expand_taxa(more_excl, families = FALSE)
 out <- rbind(out, more)
 dropped <- d[!is.na(row_of) & !take & host_taxa$pathway[row_of] == "food_fodder", c("cn8", "description")]
 cat("food lines dropped as not fresh or chilled:", nrow(dropped), "\n")
@@ -141,7 +162,7 @@ genus_rules <- list(
   # (Dracaena) og palmer (Palmae)", i.e. all trees and shrubs with soil n.e.s.;
   # SSB's label only lists examples. Corrected 2026-10-20.)
   "^06021024" = "Pelargonium",
-  "^06021025" = "Chrysanthemum;Saintpaulia;Scaevola;Streptocarpus"
+  "^06021025" = "Chrysanthemum;Scaevola;Streptocarpus"  # saintpaulia = Streptocarpus ionanthus (EPPO)
 )
 residual_rules <- list(
   "^4403(25|26)" = "Pinus;Picea;Abies", "^44032006" = "Pinus",
@@ -159,6 +180,13 @@ out$excludes_genera <- apply_rules(residual_rules)
 new_rows <- out$pathway %in% c("food_fodder", "other_plant_parts", "seeds") | grepl("^070110", out$cn8)
 out$genus[new_rows] <- more_taxa
 out$excludes_genera[new_rows] <- more_excl
+# 0602 lines in data/cn8_host_taxa.csv (decision 60): taxa named in the tariff
+# (ornamental pot plants, cuttings), scoped lines (fruit trees, fruit or vegetable
+# plants, turf), and catch-alls that do not count for vegetable crops.
+p_row <- row_of[match(out$cn8, code)]
+p_set <- startsWith(out$cn8, "0602") & !is.na(p_row)
+out$genus[p_set] <- expand_taxa(host_taxa$taxa[p_row[p_set]])
+out$excludes_genera[p_set] <- expand_taxa(host_taxa$excludes[p_row[p_set]], families = FALSE)
 # HS chapter 6 notes: 0601 (bulbs, tubers) does not cover potatoes (0701), so the
 # bulb lines do not count for a potato host
 out$excludes_genera[startsWith(out$cn8, "0601")] <- "Solanum tuberosum"
@@ -242,8 +270,10 @@ gn <- do.call(rbind, lapply(pairs, function(p) {
 }))
 gn$source <- "tolltariffstruktur"
 # crop names from data/cn8_host_taxa.csv (e.g. tomater -> Solanum), by genus;
-# family-level taxa (Orchidaceae, Fabaceae) are left out
-crop <- do.call(rbind, lapply(seq_len(nrow(host_taxa)), function(i) {
+# family-level taxa (Orchidaceae, Fabaceae) are left out. The 0602 rows list many
+# plants per row, so their words cannot be paired with genera (the tariff pairs
+# above already name them, e.g. "skjevkrone (Achimenes)").
+crop <- do.call(rbind, lapply(which(!startsWith(host_taxa$pattern, "^0602")), function(i) {
   tx <- strsplit(host_taxa$taxa[i], ";")[[1]]
   gen <- unique(sub(" .*$", "", gsub("(^|\\s)x\\s", "\\1", tx)))
   gen <- gen[nzchar(gen) & !grepl("aceae$", gen) & !startsWith(gen, "@")]

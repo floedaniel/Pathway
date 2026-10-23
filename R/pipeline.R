@@ -35,6 +35,11 @@ pathways_from_commodities <- function(commodities, settings, map = read_commodit
   commodities$pathway <- map$finnprio_pathway[match(commodities$category, map$eppo_category)]
   commodities$status <- map$status[match(commodities$category, map$eppo_category)]
   commodities$status[is.na(commodities$status)] <- "info"  # category unknown to the map
+  # Packaging (CN 4415, wooden pallets and crates traded as goods) counts only for
+  # pests with a wood commodity; for others (e.g. ToBRFV on crates) it says nothing
+  # about their packaging (decision 61).
+  wood_cats <- setdiff(map$eppo_category[map$finnprio_pathway %in% "wood"], "packaging material")
+  if (!any(commodities$category %in% wood_cats)) commodities$status[commodities$category == "packaging material"] <- "info"
   computed <- intersect(computed_pathways, commodities$pathway[commodities$status == "computed"])
   info <- lapply(stats::setNames(computed, computed), function(p) {
     rows <- commodities[commodities$pathway %in% p & commodities$status == "computed", ]

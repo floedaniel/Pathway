@@ -119,3 +119,30 @@ test_that("every food, cut-flower and seed line has an EPPO category of its path
   cat_of <- c(food_fodder = "fruits or vegetables", other_plant_parts = "cut flowers or branches", seeds = "seeds")
   expect_true(all(x$eppo_category == cat_of[x$pathway]))
 })
+
+# Open question 16 (decision 60): 0602 lines follow their customs-tariff wording.
+pfp <- function(...) pathway_lines(cn8_table, "plants_for_planting", info_of(list(...), "plants for planting"))$cn8
+test_that("potato: seed potatoes and fruit/vegetable plants, not ornamental catch-alls", {
+  x <- pfp(potato)
+  expect_true(all(c("07011000_1988", "06029092_2016") %in% x))
+  expect_false(any(c("06029021_2011", "06029022_2011", "06029098_2016", "06029049_2011", "06022000_2001",
+                     "06029043_2011", "06029031_2011") %in% x))
+  expect_true("06029010_2011" %in% x)                     # plants without soil n.e.s. still count
+})
+
+test_that("named ornamental lines count only for their plants", {
+  begonia <- h(c("Begoniaceae", "Begonia"), "Genus")
+  x <- pfp(begonia)
+  expect_true(all(c("06021021_2001", "06029043_2011", "06029051_2011", "06029032_2011") %in% x))
+  expect_false("06029031_2011" %in% x)
+  expect_true("06029021_2011" %in% x)                     # ornamental hosts keep the catch-alls
+})
+
+test_that("fruit trees, lawn grass and ornamental pepper lines", {
+  malus <- h(c("Rosaceae", "Malus"), "Genus")
+  expect_true(all(c("06022000_2001", "06029021_2011", "06029092_2016") %in% pfp(malus)))
+  expect_false("06022000_2001" %in% pfp(h(c("Rosaceae", "Fragaria", "Fragaria x ananassa"))))
+  expect_true("06029091_2011" %in% pfp(h(c("Poaceae", "Lolium", "Lolium perenne"))))
+  expect_false("06029091_2011" %in% pfp(malus))
+  expect_true("06029044_2011" %in% pfp(h(c("Solanaceae", "Capsicum", "Capsicum annuum"))))
+})

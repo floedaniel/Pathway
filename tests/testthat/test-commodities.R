@@ -102,3 +102,18 @@ test_that("fallback note when EPPO lists no host commodities", {
   expect_match(pathway_notes("wood", r)[1], "EPPO lists no host commodities")
   expect_match(pathway_basis("wood", r), "^Basis: host plants")
 })
+
+# Open question 15 (decision 61): CN 4415 is wooden packaging traded as goods; it
+# says nothing about packaging that carries a non-wood pest (e.g. ToBRFV on crates).
+test_that("packaging material counts as wood only when EPPO also lists a wood commodity", {
+  local_eppo_mock()
+  s <- test_settings()
+  withr::local_dir(root)
+  tomato <- tibble::tibble(category = c("plants for planting", "packaging material"), host = "Betula", host_code = "1BETG")
+  pc <- pathways_from_commodities(tomato, s)
+  expect_false("wood" %in% names(pc$info))
+  expect_true("packaging material" %in% pc$other)
+  expect_equal(pc$table$status[pc$table$category == "packaging material"], "info")
+  wood <- tibble::tibble(category = c("squared wood", "packaging material"), host = "Betula", host_code = "1BETG")
+  expect_setequal(pathways_from_commodities(wood, s)$info$wood$categories, c("squared wood", "packaging material"))
+})

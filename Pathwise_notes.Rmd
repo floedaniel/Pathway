@@ -30,7 +30,7 @@ Working agreements (from the user):
 ## Status
 
 - **App:** single input, four panels, LLM write-up; all five FinnPRIO pathways computed when EPPO lists the commodity (decision 57). All 318 test pests run through pipeline, Panel 1, graph and write-up without R errors (sweep 2026-10-20 after decisions 55-57: plants for planting 298 pests, wood 156, other plant parts 75, food and fodder 56, seeds 23).
-- **Tests:** all offline tests pass (323 expectations) (`testthat::test_dir("tests/testthat")`). `dev/check_selection.R` runs ANSTFR through the app's server headless (selection events, graph, write-up, reset).
+- **Tests:** all offline tests pass (335 expectations) (`testthat::test_dir("tests/testthat")`). `dev/check_selection.R` runs ANSTFR through the app's server headless (selection events, graph, write-up, reset). `dev/sweep_tables.R <old csv> <out csv>` compares every test pest's ENT3 between two CN8 tables.
 - **Git:** https://github.com/floedaniel/Pathway, branch `main`. Last deployed code: `d59da8f` (2026-10-20, includes decisions 52-57). Redeploy after changes with `Rscript dev/deploy.R`.
 - **Deployed:** Posit Connect Cloud, account `danielflow` (logged in through RStudio).
   - App: https://01a158ac-9fd3-b5d5-8776-1d40f1995348.share.connect.posit.cloud/
@@ -237,9 +237,9 @@ Note: <pathway notes>
 - Manufactured articles are partial (4416, 9406.10 only); veneer 4408, plywood 4412, profiled wood 4409 show up in the host search as "outside scope" (Open question 5).
 - Dicot bulbs/tubers are missed when EPPO has no list; soil has no CN line.
 - Food and fodder: only fresh or chilled. Seeds in kg, not pieces. Stored products and pollen have no CN line (assess manually).
-- 'n.e.s.' lines count for hosts without a line of their own: exotic hosts (e.g. Annona) get several (fruits, vegetables, roots, nuts n.e.s.).
-- Mixed 0602 lines (trees and shrubs, perennials) count for every host, also herbaceous crops such as potato or tomato (open question 16).
-- EPPO 'packaging material' maps to wood packaging (4415), also for non-woody hosts (open question 15).
+- 'n.e.s.' lines count for hosts without a line of their own: exotic hosts (e.g. Annona) get several (fruits, vegetables, roots, nuts n.e.s.); kept as an upper bound (decision 62).
+- 0602 catch-alls with soil do not count for vegetable crops (decision 60); plants without soil n.e.s. (0602 90 10) and cuttings n.e.s. still count for every host, e.g. most of Clavibacter sepedonicus plants for planting is rooted cuttings n.e.s.
+- EPPO 'packaging material' counts (as 4415 wooden packaging) only for pests with a wood commodity (decision 61); for the others packaging is left to the assessor.
 - EPPO host commodities exist only for EPPO/EU-listed pests (80 % of A1/A2, 0 % of the Alert list); the rest use host plants.
 - Mattilsynet holds genus-level import data (§ 20, § 23a); a data request, not in v1.
 
@@ -285,6 +285,7 @@ Note: <pathway notes>
 14. Decisions 55-57: answers to questions 1-14: mini model, no password (not on the free plan), library(config) removed; seed potatoes; food and fodder, other plant parts and seeds computed; host matching on EPPO taxonomy; crop-name table.
 15. Decision 58: tester's report (ANSTFR bananas and avocados): narrow EPPO groups next to named hosts no longer switch off the host filter.
 16. Decision 59: the assessor's selection of customs codes and pathways (review of the tester's improvement list); graph by customs code; Lovdata texts collapsed.
+17. Decisions 60-62: open questions 15-17: 0602 lines follow the tariff wording (named plants, fruit trees, fruit or vegetable plants, turf; no ornamental catch-alls for vegetable crops); packaging only for wood pests; n.e.s. lines kept.
 
 Plan steps dropped by the user: Step 11 (model comparison) and Step 12 (laptop + Cloudflare tunnel; replaced by Connect Cloud).
 
@@ -330,11 +331,10 @@ Plan steps dropped by the user: Step 11 (model comparison) and Step 12 (laptop +
 Answers and decisions are in `docs/decisions.md`, findings in `docs/findings.md`.
 
 ## Open questions for me
-Questions 1-14 were answered on 2026-10-20 (decisions 55-57 in `docs/decisions.md`).
+Questions 1-14 were answered on 2026-10-20 (decisions 55-57 in `docs/decisions.md`); questions 15-17 on 2026-10-23 (decisions 60-62; user: "you make the decision").
 
-15. **Packaging material for non-woody hosts.** EPPO lists "packaging material" e.g. for ToBRFV (tomato, pepper). The app maps it to wood packaging (4415 pallets and crates of any wood), giving ToBRFV a "large" wood pathway (51 million kg/year). For a tomato virus the packaging is more likely plastic crates or boxes. Keep it, count packaging only when a host is woody (e.g. conifer or a woody genus), or drop packaging for pests whose hosts are all herbaceous?
-16. **Mixed 0602 lines for herbaceous crops.** The catch-all plants-for-planting lines (06029021 trees and shrubs with soil, 06029022 perennials, ...) count for every host. For potato and tomato pests they dominate plants for planting (e.g. Clavibacter sepedonicus 11.2 million kg/year "large", mostly trees and shrubs; seed potatoes 0701 10 had no imports from its countries). Keep as upper bound, or leave out 0602 lines for hosts that have their own plants-for-planting code (seed potatoes)?
-17. **'n.e.s.' lines for exotic hosts.** A host without a code of its own (e.g. Annona for Bactrocera dorsalis) gets every 'n.e.s.' line of food and fodder: fruits, vegetables, roots and nuts n.e.s. OK as an upper bound, or should only one of them count (e.g. fruits n.e.s. when EPPO lists "fruits or vegetables" for a fruit tree)?
+No open questions.
+
 
 # Appendix A: Original plan (2026-10-20, superseded where Part 1 or docs/decisions.md differ)
 
